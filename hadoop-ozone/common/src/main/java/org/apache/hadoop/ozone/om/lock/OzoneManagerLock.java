@@ -19,18 +19,27 @@
 package org.apache.hadoop.ozone.om.lock;
 
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Consumer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.lock.LockManager;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Consumer;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_WAITING_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_WAITING_REPORTING_THRESHOLD_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_HELD_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_HELD_REPORTING_THRESHOLD_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_WRITE_LOCK_WAITING_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_WRITE_LOCK_WAITING_REPORTING_THRESHOLD_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_WRITE_LOCK_HELD_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_WRITE_LOCK_HELD_REPORTING_THRESHOLD_MS_DEFAULT;
 
 /**
  * Provides different locks to handle concurrency in OzoneMaster.
@@ -86,12 +95,55 @@ public class OzoneManagerLock {
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
 
+  private final long readLockWaitingReportingThresholdMs;
+  private final long readLockHeldReportingThresholdMs;
+
+  private final ThreadLocal<ReadLockMetrics> readLockTimeStampNanos =
+      new ThreadLocal<ReadLockMetrics>() {
+        @Override
+        public ReadLockMetrics initialValue() {
+          ReadLockMetrics readLockMetrics = new ReadLockMetrics();
+          return readLockMetrics;
+        }
+      };
+
+  private final LongAdder numReadLockLongWaiting = new LongAdder();
+  private final LongAdder numReadLockLongHold = new LongAdder();
+
+  private final long writeLockWaitingReportingThresholdMs;
+  private final long writeLockHeldReportingThresholdMs;
+
+  private final ThreadLocal<WriteLockMetrics> writeLockTimeStampNanos =
+      new ThreadLocal<WriteLockMetrics>() {
+        @Override
+        public WriteLockMetrics initialValue() {
+          WriteLockMetrics writeLockMetrics = new WriteLockMetrics();
+          return writeLockMetrics;
+        }
+      };
+
+  private long writeLockHeldTime;
+
+  private final LongAdder numWriteLockLongWaiting = new LongAdder();
+  private final LongAdder numWriteLockLongHold = new LongAdder();
 
   /**
    * Creates new OzoneManagerLock instance.
    * @param conf Configuration object
    */
   public OzoneManagerLock(ConfigurationSource conf) {
+    this.readLockWaitingReportingThresholdMs = conf.getLong(
+        OZONE_OM_READ_LOCK_WAITING_REPORTING_THRESHOLD_MS_KEY,
+        OZONE_OM_READ_LOCK_WAITING_REPORTING_THRESHOLD_MS_DEFAULT);
+    this.readLockHeldReportingThresholdMs = conf.getLong(
+        OZONE_OM_READ_LOCK_HELD_REPORTING_THRESHOLD_MS_KEY,
+        OZONE_OM_READ_LOCK_HELD_REPORTING_THRESHOLD_MS_DEFAULT);
+    this.writeLockWaitingReportingThresholdMs = conf.getLong(
+        OZONE_OM_WRITE_LOCK_WAITING_REPORTING_THRESHOLD_MS_KEY,
+        OZONE_OM_WRITE_LOCK_WAITING_REPORTING_THRESHOLD_MS_DEFAULT);
+    this.writeLockHeldReportingThresholdMs = conf.getLong(
+        OZONE_OM_WRITE_LOCK_HELD_REPORTING_THRESHOLD_MS_KEY,
+        OZONE_OM_WRITE_LOCK_HELD_REPORTING_THRESHOLD_MS_DEFAULT);
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     manager = new LockManager<>(conf, fair);
@@ -138,6 +190,8 @@ public class OzoneManagerLock {
    * be passed.
    */
   public boolean acquireReadLock(Resource resource, String... resources) {
+    /** update readLockWaitingStartTime */
+    readLockTimeStampNanos.get().setReadLockWaitingTime(Time.monotonicNowNanos());
     String resourceName = generateResourceName(resource, resources);
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
@@ -161,6 +215,8 @@ public class OzoneManagerLock {
    * be passed.
    */
   public boolean acquireWriteLock(Resource resource, String... resources) {
+    /** update writeLockWaitingStartTime */
+    writeLockTimeStampNanos.get().setWriteLockWaitingTime(Time.monotonicNowNanos());
     String resourceName = generateResourceName(resource, resources);
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
   }
@@ -177,6 +233,40 @@ public class OzoneManagerLock {
         LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
             resourceName);
       }
+
+      if (lockType == READ_LOCK) {
+        /** update readLockWaitingEndTime */
+        readLockTimeStampNanos.get().setReadLockWaitingTime(
+            Time.monotonicNowNanos() -
+                readLockTimeStampNanos.get().getReadLockWaitingTime());
+        final long readLockWaitingIntervalMs =
+            TimeUnit.NANOSECONDS.toMillis(
+                readLockTimeStampNanos.get().getReadLockWaitingTime());
+        if (readLockWaitingIntervalMs >=
+            this.readLockWaitingReportingThresholdMs) {
+          numReadLockLongWaiting.increment();
+        }
+        /** update readLockHeldStartTime */
+        readLockTimeStampNanos.get().setReadLockHeldTime(
+            Time.monotonicNowNanos());
+      } else if (lockType == WRITE_LOCK) {
+        /** update writeLockWaitingEndTime */
+        writeLockTimeStampNanos.get().setWriteLockWaitingTime(
+            Time.monotonicNowNanos() -
+                writeLockTimeStampNanos.get().getWriteLockWaitingTime());
+        final long writeLockWaitingIntervalMs =
+            TimeUnit.NANOSECONDS.toMillis(
+                writeLockTimeStampNanos.get().getWriteLockWaitingTime());
+        if (writeLockWaitingIntervalMs >=
+            this.writeLockWaitingReportingThresholdMs) {
+          numWriteLockLongWaiting.increment();
+        }
+        /** update writeLockHeldStartTime */
+        writeLockHeldTime = Time.monotonicNowNanos();
+        /*writeLockTimeStampNanos.get().setWriteLockHeldTime(
+            Time.monotonicNowNanos());*/
+      }
+
       lockSet.set(resource.setLock(lockSet.get()));
       return true;
     }
@@ -367,6 +457,31 @@ public class OzoneManagerLock {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
           resourceName);
     }
+
+    if (lockType == READ_LOCK) {
+      /** update readLockHeldEndTime */
+      readLockTimeStampNanos.get().setReadLockHeldTime(
+          Time.monotonicNowNanos() -
+              readLockTimeStampNanos.get().getReadLockHeldTime());
+      final long readLockHeldIntervalMs =
+          TimeUnit.NANOSECONDS.toMillis(
+              readLockTimeStampNanos.get().getReadLockHeldTime());
+      if (readLockHeldIntervalMs >= this.readLockHeldReportingThresholdMs) {
+        numReadLockLongHold.increment();
+      }
+    } else if (lockType == WRITE_LOCK) {
+      /** update writeLockHeldEndTime */
+      writeLockHeldTime = Time.monotonicNowNanos() - writeLockHeldTime;
+      /*writeLockTimeStampNanos.get().setWriteLockHeldTime(
+          Time.monotonicNowNanos() -
+              writeLockTimeStampNanos.get().getWriteLockHeldTime());*/
+      final long writeLockHeldIntervalMs =
+          TimeUnit.NANOSECONDS.toMillis(writeLockHeldTime);
+      if (writeLockHeldIntervalMs >= this.writeLockHeldReportingThresholdMs) {
+        numWriteLockLongHold.increment();
+      }
+    }
+
     lockSet.set(resource.clearLock(lockSet.get()));
   }
 
