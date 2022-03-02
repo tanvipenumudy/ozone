@@ -294,22 +294,22 @@ public final class OMConfigKeys {
 
   public static final String
       OZONE_OM_READ_LOCK_WAITING_THRESHOLD_MS_KEY =
-      "ozone.om.read-lock-waiting-reporting-threshold-ms";
+      "ozone.om.read-lock-waiting-threshold-ms";
   public static final long
       OZONE_OM_READ_LOCK_WAITING_THRESHOLD_MS_DEFAULT = 3000L;
   public static final String
       OZONE_OM_READ_LOCK_HELD_THRESHOLD_MS_KEY =
-      "ozone.om.read-lock-held-reporting-threshold-ms";
+      "ozone.om.read-lock-held-threshold-ms";
   public static final long
       OZONE_OM_READ_LOCK_HELD_THRESHOLD_MS_DEFAULT = 3000L;
   public static final String
       OZONE_OM_WRITE_LOCK_WAITING_THRESHOLD_MS_KEY =
-      "ozone.om.write-lock-waiting-reporting-threshold-ms";
+      "ozone.om.write-lock-waiting-threshold-ms";
   public static final long
       OZONE_OM_WRITE_LOCK_WAITING_THRESHOLD_MS_DEFAULT = 3000L;
   public static final String
       OZONE_OM_WRITE_LOCK_HELD_THRESHOLD_MS_KEY =
-      "ozone.om.write-lock-held-reporting-threshold-ms";
+      "ozone.om.write-lock-held-threshold-ms";
   public static final long
       OZONE_OM_WRITE_LOCK_HELD_THRESHOLD_MS_DEFAULT = 3000L;
 }
