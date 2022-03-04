@@ -27,7 +27,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Assert;
 import org.junit.Test;
 
+//import static org.mockito.AdditionalAnswers.answersWithDelay;
+import static org.mockito.AdditionalAnswers.*;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.mockito.AdditionalAnswers;
+import org.mockito.internal.stubbing.answers.AnswersWithDelay;
+import org.mockito.internal.stubbing.answers.Returns;
 
 import static org.junit.Assert.fail;
 
@@ -316,6 +324,51 @@ public class TestOzoneManagerLock {
       Assert.assertTrue(gotLock.get());
     }
 
+  }
+
+  @Test
+  public void testNumReadLockLongHeldTime() throws Exception {
+    String[] resourceName;
+    for (OzoneManagerLock.Resource resource :
+        OzoneManagerLock.Resource.values()) {
+      resourceName = generateResourceName(resource);
+      testNumReadLockLongHeldTimeUtil(resourceName, resource);
+    }
+  }
+
+  public void testNumReadLockLongHeldTimeUtil(String[] resourceName,
+                                              OzoneManagerLock.Resource resource) throws Exception {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    //doAnswer(answersWithDelay(5000, invocation -> null) ).when(lock.releaseReadLock(resource, resourceName));
+
+    /*when(lock.releaseReadLock(resource, resourceName)).then(answersWithDelay(500, invocation -> null));*/
+    /*doAnswer(answersWithDelay(delay, invocation -> null)).when(mockObject).doSomething();
+    when(lock.releaseReadLock(resource, resourceName).thenAnswer(new Answer<String>() {
+    @Override
+      public String answer(InvocationOnMock invocation){
+        try {
+          Thread.sleep(5000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        return ;
+      }
+    });*/
+
+    Assert.assertEquals(0, lock.getNumOfReadLockLongHeld());
+    AtomicBoolean gotLock = new AtomicBoolean(false);
+    lock.acquireReadLock(resource, resourceName); // lockset.set = 1
+    lock.acquireReadLock(resource, resourceName); // lockset.set = 2
+    lock.acquireReadLock(resource, resourceName); // lockset.set = 3
+    lock.releaseReadLock(resource, resourceName); // lockset.set = 2
+    lock.releaseReadLock(resource, resourceName); // lockset.set = 1
+    lock.releaseReadLock(resource, resourceName); // lockset.set = 0
+    gotLock.set(true);
+    Thread.sleep(5000); //temporary
+    Assert.assertTrue(gotLock.get());
+    lock.releaseReadLock(resource, resourceName);
+    Assert.assertEquals(1, lock.getNumOfReadLockLongHeld());
+    //Assert.assertTrue(lock.getNumOfReadLockLongHeld() > 0);
   }
 
   @Test
