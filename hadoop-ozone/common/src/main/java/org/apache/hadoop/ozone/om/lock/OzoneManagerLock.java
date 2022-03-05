@@ -21,8 +21,12 @@ package org.apache.hadoop.ozone.om.lock;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +35,8 @@ import org.apache.hadoop.ozone.lock.LockManager;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_DEFAULT;
 
 /**
  * Provides different locks to handle concurrency in OzoneMaster.
@@ -86,12 +92,21 @@ public class OzoneManagerLock {
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
 
+  private final AtomicLong longestReadWaitingTimeMs = new AtomicLong(-1);
+  private final AtomicLong longestReadHeldTimeMs = new AtomicLong(-1);
+
+  private final long readLockReportingThresholdMs;
+  private final LongAdder numReadLockLongHeld = new LongAdder();
+  private final LongAdder numReadLockLongWaiting = new LongAdder();
 
   /**
    * Creates new OzoneManagerLock instance.
    * @param conf Configuration object
    */
   public OzoneManagerLock(ConfigurationSource conf) {
+    this.readLockReportingThresholdMs = conf.getLong(
+        OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_KEY,
+        OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_DEFAULT);
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     manager = new LockManager<>(conf, fair);
@@ -172,13 +187,43 @@ public class OzoneManagerLock {
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
+      long startWaitingTimeNanos = Time.monotonicNowNanos();
       lockFn.accept(resourceName);
+      updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
             resourceName);
       }
       lockSet.set(resource.setLock(lockSet.get()));
       return true;
+    }
+  }
+
+  private void updateReadLockMetrics(Resource resource, String lockType,
+                                     long startWaitingTimeNanos) {
+    // condition sufficient to prevent re-acquired resource locks to update metrics
+    if (lockType == READ_LOCK &&
+        (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) {
+      long longestReadWaitingTimeNanos =
+          Time.monotonicNowNanos() - startWaitingTimeNanos;
+
+      if (longestReadWaitingTimeMs.get() < TimeUnit.NANOSECONDS.toMillis(
+          longestReadWaitingTimeNanos)) {
+        longestReadWaitingTimeMs.set(
+            TimeUnit.NANOSECONDS.toMillis(longestReadWaitingTimeNanos));
+      }
+
+      if (TimeUnit.NANOSECONDS.toMillis(
+          longestReadWaitingTimeNanos) >= this.readLockReportingThresholdMs) {
+        numReadLockLongWaiting.increment();
+        LOG.warn(
+            "Read lock waiting time {} ms is longer than default threshold {} ms",
+            TimeUnit.NANOSECONDS.toMillis(
+                longestReadWaitingTimeNanos),
+            this.readLockReportingThresholdMs);
+      }
+
+      resource.setStartHeldTimeNanos(Time.monotonicNowNanos());
     }
   }
 
@@ -362,12 +407,37 @@ public class OzoneManagerLock {
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
     lockFn.accept(resourceName);
+    updateReadUnlockMetrics(resource, lockType);
     // clear lock
     if (LOG.isDebugEnabled()) {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
           resourceName);
     }
     lockSet.set(resource.clearLock(lockSet.get()));
+  }
+
+  private void updateReadUnlockMetrics(Resource resource, String lockType) {
+    // condition not sufficient to prevent re-acquired resource unlocks to update metrics
+    if (lockType == READ_LOCK &&
+        (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) {
+      long longestReadHeldTimeNanos =
+          Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
+
+      if (longestReadHeldTimeMs.get() < TimeUnit.NANOSECONDS.toMillis(
+          longestReadHeldTimeNanos)) {
+        longestReadHeldTimeMs.set(
+            TimeUnit.NANOSECONDS.toMillis(longestReadHeldTimeNanos));
+      }
+
+      if (TimeUnit.NANOSECONDS.toMillis(
+          longestReadHeldTimeNanos) >= this.readLockReportingThresholdMs) {
+        numReadLockLongHeld.increment();
+        LOG.warn(
+            "Read lock held time {} ms is longer than default threshold {} ms",
+            TimeUnit.NANOSECONDS.toMillis(
+                longestReadHeldTimeNanos), this.readLockReportingThresholdMs);
+      }
+    }
   }
 
   /**
@@ -403,6 +473,23 @@ public class OzoneManagerLock {
 
     // Name of the resource.
     private String name;
+
+    private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
+        new ThreadLocal<LockUsageInfo>() {
+          @Override
+          public LockUsageInfo initialValue() {
+            LockUsageInfo readLockMetrics = new LockUsageInfo();
+            return readLockMetrics;
+          }
+        };
+
+    void setStartHeldTimeNanos(long startHeldTimeNanos) {
+      readLockTimeStampNanos.get().setStartHeldTimeNanos(startHeldTimeNanos);
+    }
+
+    long getStartHeldTimeNanos() {
+      return readLockTimeStampNanos.get().getStartHeldTimeNanos();
+    }
 
     Resource(byte pos, String name) {
       this.lockLevel = pos;
@@ -470,6 +557,10 @@ public class OzoneManagerLock {
 
     short getMask() {
       return mask;
+    }
+
+    short getSetMask() {
+      return setMask;
     }
   }
 
