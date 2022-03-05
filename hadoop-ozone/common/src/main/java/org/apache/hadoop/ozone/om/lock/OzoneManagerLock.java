@@ -201,7 +201,6 @@ public class OzoneManagerLock {
 
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
-    // condition sufficient to prevent re-acquired resource locks to update metrics
     if (lockType == READ_LOCK &&
         (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) {
       long longestReadWaitingTimeNanos =
@@ -417,9 +416,7 @@ public class OzoneManagerLock {
   }
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
-    // condition not sufficient to prevent re-acquired resource unlocks to update metrics
-    if (lockType == READ_LOCK &&
-        (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) {
+    if (lockType == READ_LOCK && resource.getCount() == 0) {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
@@ -473,6 +470,8 @@ public class OzoneManagerLock {
 
     // Name of the resource.
     private String name;
+
+    private int count;
 
     private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
         new ThreadLocal<LockUsageInfo>() {
@@ -530,7 +529,11 @@ public class OzoneManagerLock {
      * @return Updated value which has set lock bits.
      */
     short setLock(short lockSetVal) {
-      return (short) (lockSetVal | setMask);
+      short bitsOr = (short) (lockSetVal | setMask);
+      if (bitsOr == lockSetVal) {
+        count++;
+      }
+      return bitsOr;
     }
 
     /**
@@ -540,6 +543,9 @@ public class OzoneManagerLock {
      * @return Updated value which has cleared lock bits.
      */
     short clearLock(short lockSetVal) {
+      if (count >= 1) {
+        count--;
+      }
       return (short) (lockSetVal & ~setMask);
     }
 
@@ -561,6 +567,10 @@ public class OzoneManagerLock {
 
     short getSetMask() {
       return setMask;
+    }
+
+    int getCount() {
+      return count;
     }
   }
 
