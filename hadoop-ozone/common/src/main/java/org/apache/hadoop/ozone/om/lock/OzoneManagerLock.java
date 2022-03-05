@@ -204,7 +204,7 @@ public class OzoneManagerLock {
 
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
-    if (lockType == READ_LOCK && (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) { //&& lockSet.get() == 0) {
+    if (lockType == READ_LOCK) { //&& (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) { //&& lockSet.get() == 0) {
       long longestReadWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
       if (longestReadWaitingTimeMs.get() < TimeUnit.NANOSECONDS.toMillis(
@@ -405,12 +405,12 @@ public class OzoneManagerLock {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
           resourceName);
     }
-    temp1 = resource.clearLock(lockSet.get());
+    //temp1 = resource.clearLock(lockSet.get());
     lockSet.set(resource.clearLock(lockSet.get()));
   }
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
-    if (lockType == READ_LOCK && (resource.getSetMask() & lockSet.get()) != resource.getSetMask() && resource.getCount() == 0) {  //&& lockSet.get() == 1) {
+    if (lockType == READ_LOCK) { //&& (resource.getSetMask() & lockSet.get()) != resource.getSetMask() && resource.getCount() == 0) {  //&& lockSet.get() == 1) {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
@@ -505,11 +505,11 @@ public class OzoneManagerLock {
         return false;
       }
 
-      if((S3_BUCKET_LOCK.setMask & lockSetVal) == S3_BUCKET_LOCK.setMask ||
+/*      if((S3_BUCKET_LOCK.setMask & lockSetVal) == S3_BUCKET_LOCK.setMask ||
           (BUCKET_LOCK.setMask & lockSetVal) == BUCKET_LOCK.setMask ||
           (VOLUME_LOCK.setMask & lockSetVal) == VOLUME_LOCK.setMask){
         count++;
-      }
+      }*/
 
 
       // Our mask is the summation of bits of all previous possible locks. In
@@ -530,7 +530,9 @@ public class OzoneManagerLock {
      * @return Updated value which has set lock bits.
      */
     short setLock(short lockSetVal) {
-      return (short) (lockSetVal | setMask);
+      short or = (short) (lockSetVal | setMask);
+      if (or == lockSetVal) count++;
+      return or;
     }
 
     /**
@@ -540,7 +542,7 @@ public class OzoneManagerLock {
      * @return Updated value which has cleared lock bits.
      */
     short clearLock(short lockSetVal) {
-      return (short) (lockSetVal & ~setMask); //100 & 001
+      return (short) (lockSetVal & ~setMask); //100 & 011 //110 & 011 = 010 & 011 = 010 & 101 = 000
     }
 
     /**
@@ -548,7 +550,7 @@ public class OzoneManagerLock {
      * @param lockSetVal
      */
     boolean isLevelLocked(short lockSetVal) {
-      return (lockSetVal & setMask) == setMask;
+      return (lockSetVal & setMask) == setMask; // 100 & 100 = 100
     }
 
     String getName() {
@@ -561,10 +563,6 @@ public class OzoneManagerLock {
 
     short getSetMask() {
       return setMask;
-    }
-
-    int getCount() {
-      return count;
     }
 
     public void setMask(short mask) {

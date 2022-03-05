@@ -326,15 +326,20 @@ public class TestOzoneManagerLock {
 
   }
 
+  // can acquire bucket lock when already acquired volume lock, cannot acquire volume lock when already acquired bucket lock
+
   @Test
   public void testNumReadLockLongHeldTime() throws Exception {
     String[] resourceName;
-    for (OzoneManagerLock.Resource resource :
+    OzoneManagerLock.Resource resource = OzoneManagerLock.Resource.BUCKET_LOCK;
+    resourceName = generateResourceName(OzoneManagerLock.Resource.BUCKET_LOCK);
+    testNumReadLockLongHeldTimeUtil(resourceName, resource);
+
+    /*for (OzoneManagerLock.Resource resource :
         OzoneManagerLock.Resource.values()) {
-      if (resource == OzoneManagerLock.Resource.BUCKET_LOCK){
-      resourceName = generateResourceName(resource);
-      testNumReadLockLongHeldTimeUtil(resourceName, resource);}
-    }
+      if (resource == OzoneManagerLock.Resource.BUCKET_LOCK){*/
+
+      //}
   }
 
   public void testNumReadLockLongHeldTimeUtil(String[] resourceName,
@@ -358,18 +363,28 @@ public class TestOzoneManagerLock {
 
     Assert.assertEquals(0, lock.getNumOfReadLockLongHeld());
     //AtomicBoolean gotLock = new AtomicBoolean(false);
+
+    String[] resourceName1;
+    OzoneManagerLock.Resource resource1 = OzoneManagerLock.Resource.VOLUME_LOCK;
+    resourceName1 = generateResourceName(OzoneManagerLock.Resource.VOLUME_LOCK);
+
+    /*System.out.println(lock.getLockSet());
+    lock.acquireReadLock(resource1, resourceName1); // lockset.set = 1*/
     System.out.println(lock.getLockSet());
-    lock.acquireReadLock(resource, resourceName); // lockset.set = 1
+    lock.acquireReadLock(resource, resourceName); // lockset.set = 2  010 | 100 = 110 (6)
     System.out.println(lock.getLockSet());
     lock.acquireReadLock(resource, resourceName); // lockset.set = 2
     System.out.println(lock.getLockSet());
-    lock.acquireReadLock(resource, resourceName); // lockset.set = 3
-    System.out.println(lock.getLockSet());
-    lock.releaseReadLock(resource, resourceName); // lockset.set = 2
+    lock.acquireReadLock(resource, resourceName); // lockset.set = 2
     System.out.println(lock.getLockSet());
     lock.releaseReadLock(resource, resourceName); // lockset.set = 1
     System.out.println(lock.getLockSet());
-    lock.releaseReadLock(resource, resourceName); // lockset.set = 0
+    lock.releaseReadLock(resource, resourceName); // lockset.set = 1
+    System.out.println(lock.getLockSet());
+    lock.releaseReadLock(resource, resourceName); // lockset.set = 1
+    System.out.println(lock.getLockSet());
+/*    lock.releaseReadLock(resource1, resourceName1); // lockset.set = 0
+    System.out.println(lock.getLockSet());*/
     //System.out.println(lock.getLockSet());
     //gotLock.set(true);
     // Thread.sleep(5000); //temporary
