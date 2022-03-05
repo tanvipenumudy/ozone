@@ -331,8 +331,9 @@ public class TestOzoneManagerLock {
     String[] resourceName;
     for (OzoneManagerLock.Resource resource :
         OzoneManagerLock.Resource.values()) {
+      if (resource == OzoneManagerLock.Resource.BUCKET_LOCK){
       resourceName = generateResourceName(resource);
-      testNumReadLockLongHeldTimeUtil(resourceName, resource);
+      testNumReadLockLongHeldTimeUtil(resourceName, resource);}
     }
   }
 
@@ -356,18 +357,26 @@ public class TestOzoneManagerLock {
     });*/
 
     Assert.assertEquals(0, lock.getNumOfReadLockLongHeld());
-    AtomicBoolean gotLock = new AtomicBoolean(false);
+    //AtomicBoolean gotLock = new AtomicBoolean(false);
+    System.out.println(lock.getLockSet());
     lock.acquireReadLock(resource, resourceName); // lockset.set = 1
+    System.out.println(lock.getLockSet());
     lock.acquireReadLock(resource, resourceName); // lockset.set = 2
+    System.out.println(lock.getLockSet());
     lock.acquireReadLock(resource, resourceName); // lockset.set = 3
+    System.out.println(lock.getLockSet());
     lock.releaseReadLock(resource, resourceName); // lockset.set = 2
+    System.out.println(lock.getLockSet());
     lock.releaseReadLock(resource, resourceName); // lockset.set = 1
+    System.out.println(lock.getLockSet());
     lock.releaseReadLock(resource, resourceName); // lockset.set = 0
-    gotLock.set(true);
-    Thread.sleep(5000); //temporary
-    Assert.assertTrue(gotLock.get());
-    lock.releaseReadLock(resource, resourceName);
-    Assert.assertEquals(1, lock.getNumOfReadLockLongHeld());
+    //System.out.println(lock.getLockSet());
+    //gotLock.set(true);
+    // Thread.sleep(5000); //temporary
+    //Assert.assertTrue(gotLock.get());
+    // lock.releaseReadLock(resource, resourceName);
+    // System.out.println(lock.getLockSet());
+    // Assert.assertEquals(3, lock.getNumOfReadLockLongHeld());
     //Assert.assertTrue(lock.getNumOfReadLockLongHeld() > 0);
   }
 

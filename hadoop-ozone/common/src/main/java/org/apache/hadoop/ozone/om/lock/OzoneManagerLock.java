@@ -88,6 +88,8 @@ public class OzoneManagerLock {
   private static final String READ_LOCK = "read";
   private static final String WRITE_LOCK = "write";
 
+  short temp1;
+
   private final LockManager<String> manager;
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
@@ -202,7 +204,7 @@ public class OzoneManagerLock {
 
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
-    if (lockType == READ_LOCK && lockSet.get() == 0) {
+    if (lockType == READ_LOCK && (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) { //&& lockSet.get() == 0) {
       long longestReadWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
       if (longestReadWaitingTimeMs.get() < TimeUnit.NANOSECONDS.toMillis(
@@ -403,11 +405,12 @@ public class OzoneManagerLock {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
           resourceName);
     }
+    temp1 = resource.clearLock(lockSet.get());
     lockSet.set(resource.clearLock(lockSet.get()));
   }
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
-    if (lockType == READ_LOCK  && lockSet.get() == 1) {
+    if (lockType == READ_LOCK && (resource.getSetMask() & lockSet.get()) != resource.getSetMask() && resource.getCount() == 0) {  //&& lockSet.get() == 1) {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
@@ -444,11 +447,11 @@ public class OzoneManagerLock {
     BUCKET_LOCK((byte) 2, "BUCKET_LOCK"), // = 4
 
     // For user we need to allow s3 bucket, volume, bucket and user lock.
-    // Which is 8  4 + 2 + 1 = 15
+    // Which is 8  4 + 2 + 1 = 15 1000 + 0100 + 0010 + 0001 = 1111
     USER_LOCK((byte) 3, "USER_LOCK"), // 15
 
-    S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
-    PREFIX_LOCK((byte) 5, "PREFIX_LOCK"); //63
+    S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31 = 11111 = 15+16 = 31
+    PREFIX_LOCK((byte) 5, "PREFIX_LOCK"); //63 31 + 32 11111 2^(5+1)-1 = 64-1=63
 
     // level of the resource
     private byte lockLevel;
@@ -462,6 +465,8 @@ public class OzoneManagerLock {
 
     // Name of the resource.
     private String name;
+
+    private int count;
 
     private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
         new ThreadLocal<LockUsageInfo>() {
@@ -500,6 +505,12 @@ public class OzoneManagerLock {
         return false;
       }
 
+      if((S3_BUCKET_LOCK.setMask & lockSetVal) == S3_BUCKET_LOCK.setMask ||
+          (BUCKET_LOCK.setMask & lockSetVal) == BUCKET_LOCK.setMask ||
+          (VOLUME_LOCK.setMask & lockSetVal) == VOLUME_LOCK.setMask){
+        count++;
+      }
+
 
       // Our mask is the summation of bits of all previous possible locks. In
       // other words it is the largest possible value for that bit position.
@@ -529,7 +540,7 @@ public class OzoneManagerLock {
      * @return Updated value which has cleared lock bits.
      */
     short clearLock(short lockSetVal) {
-      return (short) (lockSetVal & ~setMask);
+      return (short) (lockSetVal & ~setMask); //100 & 001
     }
 
     /**
@@ -547,6 +558,24 @@ public class OzoneManagerLock {
     short getMask() {
       return mask;
     }
+
+    short getSetMask() {
+      return setMask;
+    }
+
+    int getCount() {
+      return count;
+    }
+
+    public void setMask(short mask) {
+      this.mask = mask;
+    }
+
+
+  }
+
+  public Short getLockSet(){
+    return lockSet.get();
   }
 
 }
