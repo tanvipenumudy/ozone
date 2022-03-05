@@ -368,8 +368,10 @@ public class TestOzoneManagerLock {
     OzoneManagerLock.Resource resource1 = OzoneManagerLock.Resource.VOLUME_LOCK;
     resourceName1 = generateResourceName(OzoneManagerLock.Resource.VOLUME_LOCK);
 
-    /*System.out.println(lock.getLockSet());
+    System.out.println(lock.getLockSet());
     lock.acquireReadLock(resource1, resourceName1); // lockset.set = 1*/
+    System.out.println(lock.getLockSet());
+    lock.acquireReadLock(resource1, resourceName1);
     System.out.println(lock.getLockSet());
     lock.acquireReadLock(resource, resourceName); // lockset.set = 2  010 | 100 = 110 (6)
     System.out.println(lock.getLockSet());
@@ -382,6 +384,10 @@ public class TestOzoneManagerLock {
     lock.releaseReadLock(resource, resourceName); // lockset.set = 1
     System.out.println(lock.getLockSet());
     lock.releaseReadLock(resource, resourceName); // lockset.set = 1
+    System.out.println(lock.getLockSet());
+    lock.releaseReadLock(resource1, resourceName1); // lockset.set = 1
+    System.out.println(lock.getLockSet());
+    lock.releaseReadLock(resource1, resourceName1); // lockset.set = 1
     System.out.println(lock.getLockSet());
 /*    lock.releaseReadLock(resource1, resourceName1); // lockset.set = 0
     System.out.println(lock.getLockSet());*/

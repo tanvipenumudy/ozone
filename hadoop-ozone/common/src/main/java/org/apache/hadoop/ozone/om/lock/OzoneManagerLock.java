@@ -204,7 +204,7 @@ public class OzoneManagerLock {
 
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
-    if (lockType == READ_LOCK) { //&& (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) { //&& lockSet.get() == 0) {
+    if (lockType == READ_LOCK && resource.getCount() == 0 && (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) { //&& (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) { //&& lockSet.get() == 0) {
       long longestReadWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
       if (longestReadWaitingTimeMs.get() < TimeUnit.NANOSECONDS.toMillis(
@@ -410,7 +410,7 @@ public class OzoneManagerLock {
   }
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
-    if (lockType == READ_LOCK) { //&& (resource.getSetMask() & lockSet.get()) != resource.getSetMask() && resource.getCount() == 0) {  //&& lockSet.get() == 1) {
+    if (lockType == READ_LOCK && resource.getCount() == 0) {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
@@ -466,7 +466,7 @@ public class OzoneManagerLock {
     // Name of the resource.
     private String name;
 
-    private int count;
+    private int count = 0;
 
     private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
         new ThreadLocal<LockUsageInfo>() {
@@ -531,7 +531,9 @@ public class OzoneManagerLock {
      */
     short setLock(short lockSetVal) {
       short or = (short) (lockSetVal | setMask);
-      if (or == lockSetVal) count++;
+      if (or == lockSetVal) {
+        count++;
+      }
       return or;
     }
 
@@ -542,6 +544,9 @@ public class OzoneManagerLock {
      * @return Updated value which has cleared lock bits.
      */
     short clearLock(short lockSetVal) {
+      if (count >= 1) {
+        count--;
+      }
       return (short) (lockSetVal & ~setMask); //100 & 011 //110 & 011 = 010 & 011 = 010 & 101 = 000
     }
 
@@ -563,6 +568,10 @@ public class OzoneManagerLock {
 
     short getSetMask() {
       return setMask;
+    }
+
+    int getCount() {
+      return count;
     }
 
     public void setMask(short mask) {
