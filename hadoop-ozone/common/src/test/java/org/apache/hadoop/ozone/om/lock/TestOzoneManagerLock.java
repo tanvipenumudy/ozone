@@ -341,4 +341,26 @@ public class TestOzoneManagerLock {
     Thread.sleep(100);
     Assert.assertTrue(gotLock.get());
   }
+
+  @Test
+  public void testSample() throws Exception {
+    String[] resourceName, resourceName1;
+
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    OzoneManagerLock.Resource resource = OzoneManagerLock.Resource.BUCKET_LOCK;
+    resourceName = generateResourceName(OzoneManagerLock.Resource.BUCKET_LOCK);
+
+    OzoneManagerLock.Resource resource1 = OzoneManagerLock.Resource.VOLUME_LOCK;
+    resourceName1 = generateResourceName(OzoneManagerLock.Resource.VOLUME_LOCK);
+
+    lock.acquireReadLock(resource, resourceName);
+    lock.acquireReadLock(resource, resourceName);
+    lock.acquireReadLock(resource, resourceName);
+    lock.releaseReadLock(resource, resourceName);
+    lock.releaseReadLock(resource, resourceName);
+    lock.releaseReadLock(resource, resourceName);
+
+  }
 }
+

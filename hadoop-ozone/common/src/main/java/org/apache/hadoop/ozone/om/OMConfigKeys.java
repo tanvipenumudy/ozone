@@ -293,9 +293,9 @@ public final class OMConfigKeys {
       = 1000;
 
   public static final String
-      OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_KEY =
-      "ozone.om.read.lock.reporting.threshold.ms";
+      OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY =
+      "ozone.om.lock.reporting.threshold.ms";
   public static final long
-      OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_DEFAULT = 3000L;
+      OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_DEFAULT = 3000L;
 
 }

@@ -980,4 +980,8 @@ public class OMMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
+
+  public void setLongestLockWaitingTimeMs(long longestLockWaitingTimeMs){
+    //
+  }
 }

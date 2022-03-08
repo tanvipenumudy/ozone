@@ -223,6 +223,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
+      //omMetrics.setLongestLockWaitingTimeMs(ozoneManager.get);
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds

@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -232,6 +233,20 @@ public class LockManager<R> {
       lockPool.returnObject(v);
       return null;
     });
+  }
+
+  /**
+   * @param resource
+   * @return
+   */
+  public int getActiveLockCount(final R resource) {
+    AtomicInteger count = new AtomicInteger(0);
+    activeLocks.computeIfPresent(resource, (k, v) -> {
+      count.set(v.getActiveLockCount());
+      return null;
+    });
+
+    return count.get();
   }
 
 }

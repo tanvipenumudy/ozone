@@ -26,17 +26,17 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 
+import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.lock.LockManager;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_DEFAULT;
 
 /**
  * Provides different locks to handle concurrency in OzoneMaster.
@@ -105,8 +105,8 @@ public class OzoneManagerLock {
    */
   public OzoneManagerLock(ConfigurationSource conf) {
     this.readLockReportingThresholdMs = conf.getLong(
-        OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_KEY,
-        OZONE_OM_READ_LOCK_REPORTING_THRESHOLD_MS_DEFAULT);
+        OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
+        OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_DEFAULT);
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     manager = new LockManager<>(conf, fair);
@@ -188,8 +188,11 @@ public class OzoneManagerLock {
       throw new RuntimeException(errorMessage);
     } else {
       long startWaitingTimeNanos = Time.monotonicNowNanos();
+      int holdCount = manager.getActiveLockCount(resourceName);
       lockFn.accept(resourceName);
-      updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
+      if (holdCount == 0) {
+        updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
+      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
             resourceName);
@@ -201,8 +204,7 @@ public class OzoneManagerLock {
 
   private void updateReadLockMetrics(Resource resource, String lockType,
                                      long startWaitingTimeNanos) {
-    if (lockType == READ_LOCK &&
-        (resource.getSetMask() & lockSet.get()) != resource.getSetMask()) {
+    if (lockType == READ_LOCK) {
       long longestReadWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
 
@@ -406,7 +408,10 @@ public class OzoneManagerLock {
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
     lockFn.accept(resourceName);
-    updateReadUnlockMetrics(resource, lockType);
+    int holdCount = manager.getActiveLockCount(resourceName);
+    if (holdCount == 0) {
+      updateReadUnlockMetrics(resource, lockType);
+    }
     // clear lock
     if (LOG.isDebugEnabled()) {
       LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
@@ -416,7 +421,7 @@ public class OzoneManagerLock {
   }
 
   private void updateReadUnlockMetrics(Resource resource, String lockType) {
-    if (lockType == READ_LOCK && resource.getCount() == 0) {
+    if (lockType == READ_LOCK) {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
@@ -470,8 +475,6 @@ public class OzoneManagerLock {
 
     // Name of the resource.
     private String name;
-
-    private int count;
 
     private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
         new ThreadLocal<LockUsageInfo>() {
@@ -529,11 +532,7 @@ public class OzoneManagerLock {
      * @return Updated value which has set lock bits.
      */
     short setLock(short lockSetVal) {
-      short bitsOr = (short) (lockSetVal | setMask);
-      if (bitsOr == lockSetVal) {
-        count++;
-      }
-      return bitsOr;
+      return (short) (lockSetVal | setMask);
     }
 
     /**
@@ -543,9 +542,6 @@ public class OzoneManagerLock {
      * @return Updated value which has cleared lock bits.
      */
     short clearLock(short lockSetVal) {
-      if (count >= 1) {
-        count--;
-      }
       return (short) (lockSetVal & ~setMask);
     }
 
@@ -563,14 +559,6 @@ public class OzoneManagerLock {
 
     short getMask() {
       return mask;
-    }
-
-    short getSetMask() {
-      return setMask;
-    }
-
-    int getCount() {
-      return count;
     }
   }
 
