@@ -229,10 +229,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Map<String, Table> tableMap = new HashMap<>();
   private OMLockMetrics omLockMetrics;
 
-  public OmMetadataManagerImpl(OzoneConfiguration conf,
-                               OMLockMetrics omLockMetrics) throws IOException {
-
-    this.lock = new OzoneManagerLock(conf, omLockMetrics);
+  public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
+    this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS = 1000L * conf.getInt(
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
@@ -254,8 +252,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    */
   protected OmMetadataManagerImpl() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    // TODO: Will handle recon lock metrics update in separate sub-task: HDDS-
-    this.lock = new OzoneManagerLock(conf, new OMLockMetrics());
+    this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS =
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
     this.omEpoch = 0;

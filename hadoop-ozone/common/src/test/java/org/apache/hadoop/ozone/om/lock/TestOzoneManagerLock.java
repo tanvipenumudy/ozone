@@ -341,4 +341,37 @@ public class TestOzoneManagerLock {
     Thread.sleep(100);
     Assert.assertTrue(gotLock.get());
   }
+
+  @Test
+  public void testLockSample() throws Exception {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    OzoneManagerLock.Resource resource = OzoneManagerLock.Resource.BUCKET_LOCK;
+    String[] resourceName = generateResourceName(resource);
+
+    System.out.println("--- Start ---");
+    printValues(lock);
+    lock.acquireReadLock(resource, resourceName);
+    printValues(lock);
+    lock.acquireReadLock(resource, resourceName);
+    printValues(lock);
+    lock.acquireReadLock(resource, resourceName);
+    printValues(lock);
+    lock.releaseReadLock(resource, resourceName);
+    printValues(lock);
+    lock.releaseReadLock(resource, resourceName);
+    printValues(lock);
+    lock.releaseReadLock(resource, resourceName);
+    printValues(lock);
+  }
+
+  public void printValues(OzoneManagerLock lock) {
+    System.out.println("getLongestReadWaitingTimeMs() -> " +
+        lock.getLongestReadWaitingTimeMs());
+    System.out.println("getLongestReadHeldTimeMs() -> " +
+        lock.getLongestReadHeldTimeMs());
+    System.out.println("getNumReadLockLongWaiting() -> " +
+        lock.getNumReadLockLongWaiting());
+    System.out.println("getNumReadLockLongHeld() -> " +
+        lock.getNumReadLockLongHeld());
+  }
 }

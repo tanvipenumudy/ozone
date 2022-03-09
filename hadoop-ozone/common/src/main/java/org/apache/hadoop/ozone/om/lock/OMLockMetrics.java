@@ -41,9 +41,10 @@ public class OMLockMetrics {
   private @Metric MutableCounterLong numReadLockLongWaiting;
   private @Metric MutableCounterLong numReadLockLongHeld;
 
-  public static OMLockMetrics create(String parent) {
+  public static OMLockMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, parent, new OMLockMetrics());
+    return ms.register(SOURCE_NAME, "Ozone Manager Lock Metrics",
+        new OMLockMetrics());
   }
 
   @VisibleForTesting

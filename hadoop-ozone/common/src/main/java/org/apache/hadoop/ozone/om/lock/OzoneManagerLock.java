@@ -98,15 +98,14 @@ public class OzoneManagerLock {
    * Creates new OzoneManagerLock instance.
    * @param conf Configuration object
    */
-  public OzoneManagerLock(ConfigurationSource conf,
-                          OMLockMetrics omLockMetrics) {
+  public OzoneManagerLock(ConfigurationSource conf) {
     this.readLockReportingThresholdMs = conf.getLong(
         OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
         OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_DEFAULT);
     boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
         OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     manager = new LockManager<>(conf, fair);
-    this.omLockMetrics = omLockMetrics;
+    omLockMetrics = OMLockMetrics.create();
   }
 
   /**
@@ -186,6 +185,7 @@ public class OzoneManagerLock {
     } else {
       long startWaitingTimeNanos = Time.monotonicNowNanos();
       int holdCount = manager.getActiveLockCount(resourceName);
+      System.out.println("--- holdCount -> " + holdCount);
       lockFn.accept(resourceName);
       if (holdCount == 0) {
         updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
@@ -407,6 +407,7 @@ public class OzoneManagerLock {
     // locks, as some locks support acquiring lock again.
     lockFn.accept(resourceName);
     int holdCount = manager.getActiveLockCount(resourceName);
+    System.out.println("--- holdCount -> " + holdCount);
     if (holdCount == 0) {
       updateReadUnlockMetrics(resource, lockType);
     }
@@ -439,6 +440,22 @@ public class OzoneManagerLock {
                 longestReadHeldTimeNanos), this.readLockReportingThresholdMs);
       }
     }
+  }
+
+  public long getLongestReadWaitingTimeMs() {
+    return omLockMetrics.getLongestReadWaitingTimeMs();
+  }
+
+  public long getLongestReadHeldTimeMs() {
+    return omLockMetrics.getLongestReadHeldTimeMs();
+  }
+
+  public long getNumReadLockLongWaiting() {
+    return omLockMetrics.getNumReadLockLongWaiting();
+  }
+
+  public long getNumReadLockLongHeld() {
+    return omLockMetrics.getNumReadLockLongHeld();
   }
 
   /**
