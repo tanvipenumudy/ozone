@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.storage.proto
@@ -226,10 +227,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private final long omEpoch;
 
   private Map<String, Table> tableMap = new HashMap<>();
+  private OMLockMetrics omLockMetrics;
 
-  public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
+  public OmMetadataManagerImpl(OzoneConfiguration conf,
+                               OMLockMetrics omLockMetrics) throws IOException {
 
-    this.lock = new OzoneManagerLock(conf);
+    this.lock = new OzoneManagerLock(conf, omLockMetrics);
     this.openKeyExpireThresholdMS = 1000L * conf.getInt(
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
@@ -251,7 +254,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    */
   protected OmMetadataManagerImpl() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    this.lock = new OzoneManagerLock(conf);
+    // TODO: Will handle recon lock metrics update in separate sub-task: HDDS-
+    this.lock = new OzoneManagerLock(conf, new OMLockMetrics());
     this.openKeyExpireThresholdMS =
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
     this.omEpoch = 0;

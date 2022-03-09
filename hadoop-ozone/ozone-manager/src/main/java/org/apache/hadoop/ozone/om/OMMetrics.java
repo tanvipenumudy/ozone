@@ -26,6 +26,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -164,9 +165,11 @@ public class OMMetrics {
   private @Metric MutableCounterLong numFiles;
 
   private final DBCheckpointMetrics dbCheckpointMetrics;
+  private final OMLockMetrics omLockMetrics;
 
   public OMMetrics() {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
+    omLockMetrics = OMLockMetrics.create("OM Metrics");
   }
 
   public static OMMetrics create() {
@@ -178,6 +181,10 @@ public class OMMetrics {
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
     return dbCheckpointMetrics;
+  }
+
+  public OMLockMetrics getOMLockMetrics() {
+    return omLockMetrics;
   }
 
   public void incNumS3BucketCreates() {
