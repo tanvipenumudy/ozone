@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +94,6 @@ public class OzoneManagerLock {
       () -> Short.valueOf((short)0));
 
   private OMLockMetrics omLockMetrics;
-
   private final long readLockReportingThresholdMs;
 
   /**
@@ -184,8 +186,10 @@ public class OzoneManagerLock {
       throw new RuntimeException(errorMessage);
     } else {
       long startWaitingTimeNanos = Time.monotonicNowNanos();
+      /**
+       *  holdCount allows metric updation only once in case of reentrant locks
+       */
       int holdCount = manager.getActiveLockCount(resourceName);
-      System.out.println("--- holdCount -> " + holdCount);
       lockFn.accept(resourceName);
       if (holdCount == 0) {
         updateReadLockMetrics(resource, lockType, startWaitingTimeNanos);
@@ -216,9 +220,10 @@ public class OzoneManagerLock {
           longestReadWaitingTimeNanos) >= this.readLockReportingThresholdMs) {
         omLockMetrics.incNumReadLockLongWaiting();
         LOG.warn(
-            "Read lock waiting time {} ms is longer than default threshold {} ms",
+            "Read lock waiting time {} ms is longer than default threshold config {}={} ms",
             TimeUnit.NANOSECONDS.toMillis(
                 longestReadWaitingTimeNanos),
+            OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
             this.readLockReportingThresholdMs);
       }
 
@@ -406,8 +411,10 @@ public class OzoneManagerLock {
     // releasing lower order level lock, as for that we need counter for
     // locks, as some locks support acquiring lock again.
     lockFn.accept(resourceName);
+    /**
+     *  holdCount allows metric updation only once in case of reentrant locks
+     */
     int holdCount = manager.getActiveLockCount(resourceName);
-    System.out.println("--- holdCount -> " + holdCount);
     if (holdCount == 0) {
       updateReadUnlockMetrics(resource, lockType);
     }
@@ -435,27 +442,61 @@ public class OzoneManagerLock {
           longestReadHeldTimeNanos) >= this.readLockReportingThresholdMs) {
         omLockMetrics.incNumReadLockLongHeld();
         LOG.warn(
-            "Read lock held time {} ms is longer than default threshold {} ms",
+            "Read lock held time {} ms is longer than default threshold config {}={} ms",
             TimeUnit.NANOSECONDS.toMillis(
-                longestReadHeldTimeNanos), this.readLockReportingThresholdMs);
+                longestReadHeldTimeNanos),
+            OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
+            this.readLockReportingThresholdMs);
       }
     }
   }
 
+  @VisibleForTesting
+  public int getHoldCount(String resourceName){
+    return manager.getActiveLockCount(resourceName);
+  }
+
+  /**
+   *
+   * @return
+   */
+  @VisibleForTesting
   public long getLongestReadWaitingTimeMs() {
     return omLockMetrics.getLongestReadWaitingTimeMs();
   }
 
+  /**
+   *
+   * @return
+   */
+  @VisibleForTesting
   public long getLongestReadHeldTimeMs() {
     return omLockMetrics.getLongestReadHeldTimeMs();
   }
 
+  /**
+   *
+   * @return
+   */
+  @VisibleForTesting
   public long getNumReadLockLongWaiting() {
     return omLockMetrics.getNumReadLockLongWaiting();
   }
 
+  /**
+   *
+   * @return
+   */
+  @VisibleForTesting
   public long getNumReadLockLongHeld() {
     return omLockMetrics.getNumReadLockLongHeld();
+  }
+
+  /**
+   *
+   */
+  public void cleanup() {
+    omLockMetrics.unRegister();
   }
 
   /**

@@ -26,12 +26,13 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * This interface is for maintaining the various Ozone Manager Lock Metrics
  */
 @InterfaceAudience.Private
-@Metrics(about = "Ozone Manager Lock Metrics", context = "dfs")
+@Metrics(about = "Ozone Manager Lock Metrics", context = OzoneConsts.OZONE)
 public class OMLockMetrics {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
@@ -41,48 +42,82 @@ public class OMLockMetrics {
   private @Metric MutableCounterLong numReadLockLongWaiting;
   private @Metric MutableCounterLong numReadLockLongHeld;
 
+  /**
+   *
+   * @return
+   */
   public static OMLockMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "Ozone Manager Lock Metrics",
         new OMLockMetrics());
   }
 
-  @VisibleForTesting
+  /**
+   *
+   */
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
+  /**
+   *
+   * @param val
+   */
   public void setLongestReadWaitingTimeMs(long val) {
     this.longestReadWaitingTimeMs.set(val);
   }
 
-  @VisibleForTesting
+  /**
+   *
+   * @param val
+   */
   public void setLongestReadHeldTimeMs(long val) {
     this.longestReadHeldTimeMs.set(val);
   }
 
-  @VisibleForTesting
+  /**
+   *
+   */
   public void incNumReadLockLongWaiting() {
     numReadLockLongWaiting.incr();
   }
 
-  @VisibleForTesting
+  /**
+   *
+   */
   public void incNumReadLockLongHeld() {
     numReadLockLongHeld.incr();
   }
 
-  @VisibleForTesting
+  /**
+   *
+   * @return
+   */
   public long getLongestReadWaitingTimeMs() {
     return longestReadWaitingTimeMs.value();
   }
 
-  @VisibleForTesting
+  /**
+   *
+   * @return
+   */
   public long getLongestReadHeldTimeMs() {
     return longestReadHeldTimeMs.value();
   }
 
-  @VisibleForTesting
+  /**
+   *
+   * @return
+   */
   public long getNumReadLockLongWaiting() {
     return numReadLockLongWaiting.value();
   }
 
-  @VisibleForTesting
+  /**
+   *
+   * @return
+   */
   public long getNumReadLockLongHeld() {
     return numReadLockLongHeld.value();
   }

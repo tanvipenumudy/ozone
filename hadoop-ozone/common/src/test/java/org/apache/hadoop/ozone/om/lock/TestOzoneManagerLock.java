@@ -29,6 +29,7 @@ import org.junit.Test;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 /**
@@ -213,6 +214,18 @@ public class TestOzoneManagerLock {
     }
   }
 
+  private String generateResourceNameUtil(OzoneManagerLock.Resource resource, String... resources) {
+    if (resources.length == 1 && resource != OzoneManagerLock.Resource.BUCKET_LOCK) {
+      return OzoneManagerLockUtil.generateResourceLockName(resource,
+          resources[0]);
+    } else if (resources.length == 2 && resource == OzoneManagerLock.Resource.BUCKET_LOCK) {
+      return OzoneManagerLockUtil.generateBucketLockName(resources[0],
+          resources[1]);
+    } else {
+      throw new IllegalArgumentException("acquire lock is supported on single" +
+          " resource for all locks except for resource bucket");
+    }
+  }
 
   /**
    * Class used to store locked resource info.
@@ -343,25 +356,49 @@ public class TestOzoneManagerLock {
   }
 
   @Test
-  public void testLockSample() throws Exception {
+  public void testLockHoldCount() throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     OzoneManagerLock.Resource resource = OzoneManagerLock.Resource.BUCKET_LOCK;
     String[] resourceName = generateResourceName(resource);
+    String resourceNameUtil = generateResourceNameUtil(resource, resourceName);
 
-    System.out.println("--- Start ---");
-    printValues(lock);
+    assertEquals(0, lock.getHoldCount(resourceNameUtil));
+
     lock.acquireReadLock(resource, resourceName);
-    printValues(lock);
+    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+
     lock.acquireReadLock(resource, resourceName);
-    printValues(lock);
+    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+
     lock.acquireReadLock(resource, resourceName);
-    printValues(lock);
+    assertEquals(3, lock.getHoldCount(resourceNameUtil));
+
     lock.releaseReadLock(resource, resourceName);
-    printValues(lock);
+    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+
     lock.releaseReadLock(resource, resourceName);
-    printValues(lock);
+    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+
     lock.releaseReadLock(resource, resourceName);
-    printValues(lock);
+    assertEquals(0, lock.getHoldCount(resourceNameUtil));
+
+    lock.acquireWriteLock(resource, resourceName);
+    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+
+    lock.acquireWriteLock(resource, resourceName);
+    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+
+    lock.acquireWriteLock(resource, resourceName);
+    assertEquals(3, lock.getHoldCount(resourceNameUtil));
+
+    lock.releaseWriteLock(resource, resourceName);
+    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+
+    lock.releaseWriteLock(resource, resourceName);
+    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+
+    lock.releaseWriteLock(resource, resourceName);
+    assertEquals(0, lock.getHoldCount(resourceNameUtil));
   }
 
   public void printValues(OzoneManagerLock lock) {

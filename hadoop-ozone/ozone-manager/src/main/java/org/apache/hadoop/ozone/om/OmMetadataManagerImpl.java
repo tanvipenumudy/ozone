@@ -515,6 +515,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       store.close();
       store = null;
     }
+    // Ozone Manager lock cleanup
+    lock.cleanup();
   }
 
   /**
