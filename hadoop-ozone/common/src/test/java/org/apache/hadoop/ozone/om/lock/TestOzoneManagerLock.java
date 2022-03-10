@@ -403,9 +403,9 @@ public class TestOzoneManagerLock {
 
   public void printValues(OzoneManagerLock lock) {
     System.out.println("getLongestReadWaitingTimeMs() -> " +
-        lock.getLongestReadWaitingTimeMs());
+        lock.getLongestReadLockWaitingTimeMs());
     System.out.println("getLongestReadHeldTimeMs() -> " +
-        lock.getLongestReadHeldTimeMs());
+        lock.getLongestReadLockHeldTimeMs());
     System.out.println("getNumReadLockLongWaiting() -> " +
         lock.getNumReadLockLongWaiting());
     System.out.println("getNumReadLockLongHeld() -> " +

@@ -209,10 +209,10 @@ public class OzoneManagerLock {
       long longestReadWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
 
-      if (omLockMetrics.getLongestReadWaitingTimeMs() <
+      if (omLockMetrics.getLongestReadLockWaitingTimeMs() <
           TimeUnit.NANOSECONDS.toMillis(
               longestReadWaitingTimeNanos)) {
-        omLockMetrics.setLongestReadWaitingTimeMs(
+        omLockMetrics.setLongestReadLockWaitingTimeMs(
             TimeUnit.NANOSECONDS.toMillis(longestReadWaitingTimeNanos));
       }
 
@@ -220,7 +220,7 @@ public class OzoneManagerLock {
           longestReadWaitingTimeNanos) >= this.readLockReportingThresholdMs) {
         omLockMetrics.incNumReadLockLongWaiting();
         LOG.warn(
-            "Read lock waiting time {} ms is longer than default threshold config {}={} ms",
+            "Read lock waiting time {} ms is longer than default threshold configuration {} = {} ms",
             TimeUnit.NANOSECONDS.toMillis(
                 longestReadWaitingTimeNanos),
             OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
@@ -431,10 +431,10 @@ public class OzoneManagerLock {
       long longestReadHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
-      if (omLockMetrics.getLongestReadHeldTimeMs() <
+      if (omLockMetrics.getLongestReadLockHeldTimeMs() <
           TimeUnit.NANOSECONDS.toMillis(
               longestReadHeldTimeNanos)) {
-        omLockMetrics.setLongestReadHeldTimeMs(
+        omLockMetrics.setLongestReadLockHeldTimeMs(
             TimeUnit.NANOSECONDS.toMillis(longestReadHeldTimeNanos));
       }
 
@@ -442,7 +442,7 @@ public class OzoneManagerLock {
           longestReadHeldTimeNanos) >= this.readLockReportingThresholdMs) {
         omLockMetrics.incNumReadLockLongHeld();
         LOG.warn(
-            "Read lock held time {} ms is longer than default threshold config {}={} ms",
+            "Read lock held time {} ms is longer than default threshold configuration {} = {} ms",
             TimeUnit.NANOSECONDS.toMillis(
                 longestReadHeldTimeNanos),
             OZONE_OM_LOCK_REPORTING_THRESHOLD_MS_KEY,
@@ -461,8 +461,8 @@ public class OzoneManagerLock {
    * @return
    */
   @VisibleForTesting
-  public long getLongestReadWaitingTimeMs() {
-    return omLockMetrics.getLongestReadWaitingTimeMs();
+  public long getLongestReadLockWaitingTimeMs() {
+    return omLockMetrics.getLongestReadLockWaitingTimeMs();
   }
 
   /**
@@ -470,8 +470,8 @@ public class OzoneManagerLock {
    * @return
    */
   @VisibleForTesting
-  public long getLongestReadHeldTimeMs() {
-    return omLockMetrics.getLongestReadHeldTimeMs();
+  public long getLongestReadLockHeldTimeMs() {
+    return omLockMetrics.getLongestReadLockHeldTimeMs();
   }
 
   /**

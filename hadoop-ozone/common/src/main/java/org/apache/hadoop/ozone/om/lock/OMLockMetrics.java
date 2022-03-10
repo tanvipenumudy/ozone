@@ -37,8 +37,8 @@ public class OMLockMetrics {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
 
-  private @Metric MutableGaugeLong longestReadWaitingTimeMs;
-  private @Metric MutableGaugeLong longestReadHeldTimeMs;
+  private @Metric MutableGaugeLong longestReadLockWaitingTimeMs;
+  private @Metric MutableGaugeLong longestReadLockHeldTimeMs;
   private @Metric MutableCounterLong numReadLockLongWaiting;
   private @Metric MutableCounterLong numReadLockLongHeld;
 
@@ -64,16 +64,16 @@ public class OMLockMetrics {
    *
    * @param val
    */
-  public void setLongestReadWaitingTimeMs(long val) {
-    this.longestReadWaitingTimeMs.set(val);
+  public void setLongestReadLockWaitingTimeMs(long val) {
+    this.longestReadLockWaitingTimeMs.set(val);
   }
 
   /**
    *
    * @param val
    */
-  public void setLongestReadHeldTimeMs(long val) {
-    this.longestReadHeldTimeMs.set(val);
+  public void setLongestReadLockHeldTimeMs(long val) {
+    this.longestReadLockHeldTimeMs.set(val);
   }
 
   /**
@@ -94,16 +94,16 @@ public class OMLockMetrics {
    *
    * @return
    */
-  public long getLongestReadWaitingTimeMs() {
-    return longestReadWaitingTimeMs.value();
+  public long getLongestReadLockWaitingTimeMs() {
+    return longestReadLockWaitingTimeMs.value();
   }
 
   /**
    *
    * @return
    */
-  public long getLongestReadHeldTimeMs() {
-    return longestReadHeldTimeMs.value();
+  public long getLongestReadLockHeldTimeMs() {
+    return longestReadLockHeldTimeMs.value();
   }
 
   /**
