@@ -357,48 +357,62 @@ public class TestOzoneManagerLock {
 
   @Test
   public void testLockHoldCount() throws Exception {
+    String[] resourceName;
+    String resourceNameUtil;
+    for (OzoneManagerLock.Resource resource :
+        OzoneManagerLock.Resource.values()) {
+      // USER_LOCK, S3_SECRET_LOCK and PREFIX_LOCK disallow lock re-acquire by
+      // a single thread
+      if (resource != OzoneManagerLock.Resource.USER_LOCK &&
+          resource != OzoneManagerLock.Resource.S3_SECRET_LOCK &&
+          resource != OzoneManagerLock.Resource.PREFIX_LOCK) {
+        resourceName = generateResourceName(resource);
+        resourceNameUtil = generateResourceNameUtil(resource, resourceName);
+        testLockHoldCountUtil(resource, resourceName, resourceNameUtil);
+      }
+    }
+  }
+
+  private void testLockHoldCountUtil(OzoneManagerLock.Resource resource, String[] resourceName, String resourceNameUtil) throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-    OzoneManagerLock.Resource resource = OzoneManagerLock.Resource.BUCKET_LOCK;
-    String[] resourceName = generateResourceName(resource);
-    String resourceNameUtil = generateResourceNameUtil(resource, resourceName);
 
-    assertEquals(0, lock.getHoldCount(resourceNameUtil));
+      assertEquals(0, lock.getHoldCount(resourceNameUtil));
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+      lock.acquireReadLock(resource, resourceName);
+      assertEquals(1, lock.getHoldCount(resourceNameUtil));
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+      lock.acquireReadLock(resource, resourceName);
+      assertEquals(2, lock.getHoldCount(resourceNameUtil));
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(3, lock.getHoldCount(resourceNameUtil));
+      lock.acquireReadLock(resource, resourceName);
+      assertEquals(3, lock.getHoldCount(resourceNameUtil));
 
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+      lock.releaseReadLock(resource, resourceName);
+      assertEquals(2, lock.getHoldCount(resourceNameUtil));
 
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+      lock.releaseReadLock(resource, resourceName);
+      assertEquals(1, lock.getHoldCount(resourceNameUtil));
 
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(0, lock.getHoldCount(resourceNameUtil));
+      lock.releaseReadLock(resource, resourceName);
+      assertEquals(0, lock.getHoldCount(resourceNameUtil));
 
-    lock.acquireWriteLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+      lock.acquireWriteLock(resource, resourceName);
+      assertEquals(1, lock.getHoldCount(resourceNameUtil));
 
-    lock.acquireWriteLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+      lock.acquireWriteLock(resource, resourceName);
+      assertEquals(2, lock.getHoldCount(resourceNameUtil));
 
-    lock.acquireWriteLock(resource, resourceName);
-    assertEquals(3, lock.getHoldCount(resourceNameUtil));
+      lock.acquireWriteLock(resource, resourceName);
+      assertEquals(3, lock.getHoldCount(resourceNameUtil));
 
-    lock.releaseWriteLock(resource, resourceName);
-    assertEquals(2, lock.getHoldCount(resourceNameUtil));
+      lock.releaseWriteLock(resource, resourceName);
+      assertEquals(2, lock.getHoldCount(resourceNameUtil));
 
-    lock.releaseWriteLock(resource, resourceName);
-    assertEquals(1, lock.getHoldCount(resourceNameUtil));
+      lock.releaseWriteLock(resource, resourceName);
+      assertEquals(1, lock.getHoldCount(resourceNameUtil));
 
-    lock.releaseWriteLock(resource, resourceName);
-    assertEquals(0, lock.getHoldCount(resourceNameUtil));
+      lock.releaseWriteLock(resource, resourceName);
+      assertEquals(0, lock.getHoldCount(resourceNameUtil));
   }
 
   public void printValues(OzoneManagerLock lock) {
