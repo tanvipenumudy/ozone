@@ -210,18 +210,18 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
         .build();
 
     ExecutorService readService = Executors.newFixedThreadPool(readThreadCount);
-    for (int i = 0; i < numOfReadOperations; i++) {
-      readService.execute(new Runnable() {
-        @Override
-        public void run() {
-          try {
+    readService.execute(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          for (int i = 0; i < numOfReadOperations; i++) {
             keyManager.listStatus(keyArgs, false, "", fileCountForRead);
-          } catch (IOException e) {
-            e.printStackTrace();
           }
+        } catch (IOException e) {
+          e.printStackTrace();
         }
-      });
-    }
+      }
+    });
   }
 
   private void writeOperations() throws IOException {
@@ -235,18 +235,18 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
     ExecutorService writeService =
         Executors.newFixedThreadPool(writeThreadCount);
-    for (int i = 0; i < numOfWriteOperations; i++) {
-      writeService.execute(new Runnable() {
-        @Override
-        public void run() {
-          try {
+    writeService.execute(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          for (int i = 0; i < numOfWriteOperations; i++) {
             createFiles(writePath, fileCountForWrite);
-          } catch (Exception e) {
-            e.printStackTrace();
           }
+        } catch (Exception e) {
+          e.printStackTrace();
         }
-      });
-    }
+      }
+    });
   }
 
   private void createFile(String dir, long counter) throws Exception {
