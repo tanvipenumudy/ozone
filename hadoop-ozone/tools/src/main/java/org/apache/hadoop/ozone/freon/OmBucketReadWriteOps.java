@@ -99,7 +99,7 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   // do we need a separate fileSizeInBytes for read and write?
 
-  @Option(names = {"-b", "--buffer"},
+  @Option(names = {"-bf", "--buffer"},
       description = "Size of buffer used to generated the file content.",
       defaultValue = "256")
   private int bufferSize;
