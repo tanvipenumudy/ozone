@@ -184,15 +184,16 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   }
 
   private void mainMethod(long counter) throws Exception {
+    readOperations(counter);
+    writeOperations();
+  }
+
+  private void readOperations(long counter) throws Exception {
 
     // Step-1)
     String readPath = prefixPath.concat("/").concat("readPath");
     fileSystem.mkdirs(new Path(readPath));
     createFiles(readPath, fileCountForRead);
-
-    String message = "Successfully files for read operations. Total Files " +
-        "Count:" + timer.getCount();
-    print(message);
 
     // Step-2)
     int readThreadCount = (readThreadPercentage / 100) * totalThreadCount;
@@ -221,9 +222,13 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
         }
       });
     }
+  }
+
+  private void writeOperations() throws IOException {
 
     // Step-3)
-    int writeThreadCount = totalThreadCount - readThreadCount;
+    int writeThreadCount =
+        totalThreadCount - ((readThreadPercentage / 100) * totalThreadCount);
 
     String writePath = prefixPath.concat("/").concat("writePath");
     fileSystem.mkdirs(new Path(writePath));
