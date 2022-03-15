@@ -48,8 +48,8 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL
  */
 @Command(name = "obrwo",
     aliases = "om-bucket-read-write-ops",
-    description = "Generate files, perform respective read/write operations " +
-        "to measure lock performance, simulate lock contention.",
+    description = "Generates files, performs respective read/write " +
+        "operations to measure lock performance, simulate lock contention.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -72,19 +72,19 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
       defaultValue = "bucket1")
   private String bucketName;
 
-  @Option(names = {"-pf", "prefix-file-path", "--prefixFilePath"},
+  @Option(names = {"-P", "prefix-file-path", "--prefixFilePath"},
       description = "Prefix file path. Full name --prefixFilePath will be " +
           "removed in later versions.",
       defaultValue = "/dir1/dir2")
   private String prefixFilePath;
 
-  @Option(names = {"-rc", "--file-count-for-read", "--fileCountForRead"},
+  @Option(names = {"-r", "--file-count-for-read", "--fileCountForRead"},
       description = "Number of files to be written in the read directory. " +
           "Full name --fileCountForRead will be removed in later versions.",
       defaultValue = "1000")
   private int fileCountForRead;
 
-  @Option(names = {"-wc", "--file-count-for-write", "--fileCountForWrite"},
+  @Option(names = {"-w", "--file-count-for-write", "--fileCountForWrite"},
       description = "Number of files to be written in the write directory. " +
           "Full name --fileCountForWrite will be removed in later versions.",
       defaultValue = "1000")
@@ -99,7 +99,7 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   // do we need a separate fileSizeInBytes for read and write?
 
-  @Option(names = {"-bf", "--buffer"},
+  @Option(names = {"-B", "--buffer"},
       description = "Size of buffer used to generated the file content.",
       defaultValue = "256")
   private int bufferSize;
@@ -111,27 +111,27 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
       defaultValue = "10")
   private int length;
 
-  @Option(names = {"-tc", "--total-thread-count", "--totalThreadCount"},
+  @Option(names = {"-c", "--total-thread-count", "--totalThreadCount"},
       description = "Total number of threads to be executed. Full name " +
           "--totalThreadCount will be removed in later versions.",
       defaultValue = "100")
   private int totalThreadCount;
 
-  @Option(names = {"-rp", "--read-thread-percentage", "--readThreadPercentage"},
+  @Option(names = {"-T", "--read-thread-percentage", "--readThreadPercentage"},
       description = "Percentage of the total number of threads to be " +
           "allocated for read operations. Full name --readThreadPercentage " +
           "will be removed in later versions.",
       defaultValue = "90")
   private int readThreadPercentage;
 
-  @Option(names = {"-ro", "--num-of-read-operations", "--numOfReadOperations"},
+  @Option(names = {"-R", "--num-of-read-operations", "--numOfReadOperations"},
       description = "Number of read operations to be performed by each " +
           "thread. Full name --numOfReadOperations will be removed in later " +
           "versions.",
       defaultValue = "50")
   private int numOfReadOperations;
 
-  @Option(names = {"-wo", "--num-of-write-operations",
+  @Option(names = {"-W", "--num-of-write-operations",
       "--numOfWriteOperations"},
       description = "Number of write operations to be performed by each " +
           "thread. Full name --numOfWriteOperations will be removed in later " +
@@ -156,6 +156,8 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   private String prefixPath =
       "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
+
+  // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436) in the end.
 
   @Override
   public Void call() throws Exception {
