@@ -44,21 +44,21 @@ import java.net.URI;
 import java.util.ArrayList;
 
 /**
- * Test for HadoopDirTreeGenerator.
+ * Test for OmBucketReadWriteOps.
  */
-public class TestHadoopDirTreeGenerator {
+public class TestOmBucketReadWriteOps {
 
   private String path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
   private static final Logger LOG =
-          LoggerFactory.getLogger(TestHadoopDirTreeGenerator.class);
+      LoggerFactory.getLogger(TestOmBucketReadWriteOps.class);
 
   @Before
   public void setup() {
     path = GenericTestUtils
-            .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
+        .getTempPath(TestOmBucketReadWriteOps.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.DEBUG);
     File baseDir = new File(path);
@@ -100,95 +100,39 @@ public class TestHadoopDirTreeGenerator {
     try {
       startCluster();
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
-              "conf"));
+          "conf"));
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
-
-      verifyDirTree("vol1", "bucket1", 1,
-              1, 1, 0);
-      verifyDirTree("vol2", "bucket1", 1,
-              5, 1, 5);
-      verifyDirTree("vol3", "bucket1", 2,
-              5, 3, 1);
-      verifyDirTree("vol4", "bucket1", 3,
-              2, 4, 2);
-      verifyDirTree("vol5", "bucket1", 5,
-              4, 1, 0);
-      // default page size is Constants.LISTING_PAGE_SIZE = 1024
-      verifyDirTree("vol6", "bucket1", 2,
-              1, 1100, 0);
+      verifyReadWriteOps("vol1", "bucket1", "/dir1/dir2/dir3");
     } finally {
       shutdown();
     }
   }
 
-  private void verifyDirTree(String volumeName, String bucketName, int depth,
-                             int span, int fileCount, int perFileSizeInBytes)
-          throws IOException {
-
+  private void verifyReadWriteOps(String volumeName, String bucketName,
+                                  String prefixFilePath) throws IOException {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
-    String rootPath = "o3fs://" + bucketName + "." + volumeName;
+    String rootPath =
+        "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
-        new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
-            fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
-                     "-g", perFileSizeInBytes + ""});
-    // verify the directory structure
-    LOG.info("Started verifying the directory structure...");
+        new String[]{"-conf", confPath, "obrwo", "--volume", volumeName + "",
+            "--bucket", bucketName + "", "--prefixFilePath", prefixFilePath + ""});
+
+    LOG.info("Started verifying read/write ops...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
-            conf);
-    Path rootDir = new Path(rootPath.concat("/"));
-    // verify root path details
+        conf);
+    Path rootDir = new Path(rootPath.concat("/readPath"));
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
     for (FileStatus fileStatus : fileStatuses) {
-      // verify the num of peer directories, expected span count is 1
-      // as it has only one dir at root.
-      verifyActualSpan(1, fileStatuses);
-      int actualDepth = traverseToLeaf(fileSystem, fileStatus.getPath(),
-              1, depth, span, fileCount, perFileSizeInBytes);
-      Assert.assertEquals("Mismatch depth in a path",
-              depth, actualDepth);
+      verifyCreatedFiles(1000, fileStatuses);
     }
   }
 
-  private int traverseToLeaf(FileSystem fs, Path dirPath, int depth,
-                             int expectedDepth, int expectedSpanCnt,
-                             int expectedFileCnt, int perFileSizeInBytes)
-          throws IOException {
-    FileStatus[] fileStatuses = fs.listStatus(dirPath);
-    // check the num of peer directories except root and leaf as both
-    // has less dirs.
-    if (depth < expectedDepth - 1) {
-      verifyActualSpan(expectedSpanCnt, fileStatuses);
-    }
-    int actualNumFiles = 0;
-    ArrayList <String> files = new ArrayList<>();
-    for (FileStatus fileStatus : fileStatuses) {
-      if (fileStatus.isDirectory()) {
-        ++depth;
-        return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
-                expectedSpanCnt, expectedFileCnt, perFileSizeInBytes);
-      } else {
-        Assert.assertEquals("Mismatches file len",
-                perFileSizeInBytes, fileStatus.getLen());
-        String fName = fileStatus.getPath().getName();
-        Assert.assertFalse("actualNumFiles:" + actualNumFiles +
-                        ", fName:" + fName + ", expectedFileCnt:" +
-                        expectedFileCnt + ", depth:" + depth,
-                files.contains(fName));
-        files.add(fName);
-        actualNumFiles++;
-      }
-    }
-    Assert.assertEquals("Mismatches files count in a directory",
-            expectedFileCnt, actualNumFiles);
-    return depth;
-  }
-
-  private int verifyActualSpan(int expectedSpanCnt,
+  private int verifyCreatedFiles(int expectedFileCnt,
                                FileStatus[] fileStatuses) {
     int actualSpan = 0;
     for (FileStatus fileStatus : fileStatuses) {
@@ -197,7 +141,8 @@ public class TestHadoopDirTreeGenerator {
       }
     }
     Assert.assertEquals("Mismatches subdirs count in a directory",
-            expectedSpanCnt, actualSpan);
+        expectedFileCnt, actualSpan);
     return actualSpan;
   }
+
 }
