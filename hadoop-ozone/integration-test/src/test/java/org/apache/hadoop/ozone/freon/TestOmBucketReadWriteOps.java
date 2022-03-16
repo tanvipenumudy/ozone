@@ -104,7 +104,7 @@ public class TestOmBucketReadWriteOps {
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
-      verifyReadWriteOps("vol2", "bucket2", "/dir1/dir2/dir3");
+      verifyReadWriteOps("vol1", "bucket1", "/dir1/dir2/dir3");
     } finally {
       shutdown();
     }
@@ -119,41 +119,30 @@ public class TestOmBucketReadWriteOps {
         "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
-        new String[]{"-conf", confPath, "obrwo", "-P", rootPath, "-n", "1"});
+        new String[]{"-conf", confPath, "obrwo", "-v", volumeName,
+            "-b", bucketName, "-P", prefixFilePath, "-n", "1"});
 
     LOG.info("Started verifying read/write ops...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
         conf);
     Path rootDir = new Path(rootPath.concat("/"));
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
-    verify(2, fileStatuses, true);
-
-    Path readDir = new Path(rootPath.concat("/readPath"));
-    FileStatus[] readFileStatuses = fileSystem.listStatus(readDir);
-    verify(100, readFileStatuses, false);
-
-    Path writeDir = new Path(rootPath.concat("/writePath"));
-    FileStatus[] writeFileStatuses = fileSystem.listStatus(writeDir);
-    verify(50, writeFileStatuses, false);
+    for (FileStatus fileStatus : fileStatuses) {
+      verifyCreatedFiles(1000, fileStatuses);
+    }
   }
 
-  private int verify(int expectedCount, FileStatus[] fileStatuses,
-                     boolean checkDir) {
-    int actual = 0;
-    if (checkDir) {
-      for (FileStatus fileStatus : fileStatuses) {
-        if (fileStatus.isDirectory()) {
-          ++actual;
-        }
-      }
-    } else {
-      for (FileStatus fileStatus : fileStatuses) {
-        if (fileStatus.isFile()) {
-          ++actual;
-        }
+  private int verifyCreatedFiles(int expectedFileCnt,
+                               FileStatus[] fileStatuses) {
+    int actualSpan = 0;
+    for (FileStatus fileStatus : fileStatuses) {
+      if (fileStatus.isDirectory()) {
+        ++actualSpan;
       }
     }
-    Assert.assertEquals("Mismatch Count!", expectedCount, actual);
-    return actual;
+    Assert.assertEquals("Mismatches subdirs count in a directory",
+        expectedFileCnt, actualSpan);
+    return actualSpan;
   }
+
 }
