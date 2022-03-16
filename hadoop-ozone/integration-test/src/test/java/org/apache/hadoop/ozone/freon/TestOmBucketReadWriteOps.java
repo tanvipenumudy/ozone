@@ -103,9 +103,28 @@ public class TestOmBucketReadWriteOps {
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
+
+      verifyReadWriteOps(new ParameterBuilder());
       verifyReadWriteOps(
-          new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket2")
+          new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3"));
+      verifyReadWriteOps(
+          new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
+              .setPrefixFilePath("/").setFileCountForRead(1000)
+              .setFileCountForWrite(100).setTotalThreadCount(505));
+      verifyReadWriteOps(
+          new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
+              .setPrefixFilePath("/dir1/").setFileSizeInBytes(128)
+              .setBufferSize(32));
+      verifyReadWriteOps(
+          new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
+              .setPrefixFilePath("/dir1/dir2/dir3").setFileCountForRead(250)
+              .setNumOfReadOperations(100).setNumOfWriteOperations(0));
+      verifyReadWriteOps(
+          new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
+              .setPrefixFilePath("/dir1/dir2/dir3").setFactor("ONE")
+              .setNumOfReadOperations(0).setFileCountForWrite(20)
+              .setNumOfWriteOperations(100));
     } finally {
       shutdown();
     }
@@ -132,7 +151,7 @@ public class TestOmBucketReadWriteOps {
             "-R", String.valueOf(parameterBuilder.numOfReadOperations),
             "-W", String.valueOf(parameterBuilder.numOfWriteOperations),
             "-F", String.valueOf(parameterBuilder.factor),
-            "-n", "1"});
+            "-n", String.valueOf(1)});
 
     LOG.info("Started verifying read/write ops...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
