@@ -170,8 +170,8 @@ public class TestOmBucketReadWriteOps {
         parameterBuilder.numOfWriteOperations, writeFileStatuses, false);
   }
 
-  private int verifyUtil(int expectedCount, FileStatus[] fileStatuses,
-                     boolean checkDir) {
+  private void verifyUtil(int expectedCount, FileStatus[] fileStatuses,
+                          boolean checkDir) {
     int actual = 0;
     if (checkDir) {
       for (FileStatus fileStatus : fileStatuses) {
@@ -187,7 +187,6 @@ public class TestOmBucketReadWriteOps {
       }
     }
     Assert.assertEquals("Mismatch Count!", expectedCount, actual);
-    return actual;
   }
 
   private class ParameterBuilder {
