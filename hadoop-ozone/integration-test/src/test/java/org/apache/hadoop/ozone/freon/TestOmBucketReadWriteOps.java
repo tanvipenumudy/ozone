@@ -96,7 +96,7 @@ public class TestOmBucketReadWriteOps {
   }
 
   @Test
-  public void testNestedDirTreeGeneration() throws Exception {
+  public void testFileGeneration() throws Exception {
     try {
       startCluster();
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
@@ -119,13 +119,13 @@ public class TestOmBucketReadWriteOps {
         "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
-        new String[]{"-conf", confPath, "obrwo", "--volume", volumeName + "",
-            "--bucket", bucketName + "", "--prefixFilePath", prefixFilePath + ""});
+        new String[]{"-conf", confPath, "obrwo", "-v", volumeName,
+            "-b", bucketName, "-P", prefixFilePath, "-n", "1"});
 
     LOG.info("Started verifying read/write ops...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
         conf);
-    Path rootDir = new Path(rootPath.concat("/readPath"));
+    Path rootDir = new Path(rootPath.concat("/"));
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
     for (FileStatus fileStatus : fileStatuses) {
       verifyCreatedFiles(1000, fileStatuses);

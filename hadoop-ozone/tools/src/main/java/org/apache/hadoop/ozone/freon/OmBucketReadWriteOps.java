@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
@@ -81,20 +82,20 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   @Option(names = {"-r", "--file-count-for-read", "--fileCountForRead"},
       description = "Number of files to be written in the read directory. " +
           "Full name --fileCountForRead will be removed in later versions.",
-      defaultValue = "1000")
+      defaultValue = "100")
   private int fileCountForRead;
 
   @Option(names = {"-w", "--file-count-for-write", "--fileCountForWrite"},
       description = "Number of files to be written in the write directory. " +
           "Full name --fileCountForWrite will be removed in later versions.",
-      defaultValue = "1000")
+      defaultValue = "100")
   private int fileCountForWrite;
 
   @Option(names = {"-g", "--file-size", "--fileSize"},
       description = "Generated data size (in bytes) of each file to be " +
           "written in each directory. Full name --fileSize will be removed " +
           "in later versions.",
-      defaultValue = "1024")
+      defaultValue = "256")
   private long fileSizeInBytes;
 
   // do we need a separate fileSizeInBytes for read and write?
@@ -152,8 +153,6 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   private FileSystem fileSystem;
 
-  private KeyManagerImpl keyManager;
-
   private String prefixPath =
       "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
 
@@ -162,6 +161,8 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   @Override
   public Void call() throws Exception {
     init();
+    prefixPath =
+        "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
     LOG.info("volumeName: " + volumeName);
     LOG.info("bucketName: " + bucketName);
     LOG.info("prefixFilePath: " + prefixFilePath);
@@ -186,11 +187,15 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   }
 
   private void mainMethod(long counter) throws Exception {
-    readOperations(counter);
-    writeOperations();
+    Future<Integer> readFuture = readOperations();
+    Future<Integer> writeFuture = writeOperations();
+    int rCount = readFuture.get();
+    System.out.println("Total Files Read = " + rCount);
+    int wCount = writeFuture.get();
+    System.out.println("Total Files Written = " + wCount);
   }
 
-  private void readOperations(long counter) throws Exception {
+  private Future<Integer> readOperations() throws Exception {
 
     // Step-1)
     String readPath = prefixPath.concat("/").concat("readPath");
@@ -198,57 +203,50 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
     createFiles(readPath, fileCountForRead);
 
     // Step-2)
-    int readThreadCount = (readThreadPercentage / 100) * totalThreadCount;
-
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
-        .setKeyName(generateObjectName(counter))
-        .setLocationInfoList(new ArrayList<>())
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
-            ALL, ALL))
-        .build();
+    int readThreadCount = (readThreadPercentage * totalThreadCount) / 100;
 
     ExecutorService readService = Executors.newFixedThreadPool(readThreadCount);
-    readService.execute(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          for (int i = 0; i < numOfReadOperations; i++) {
-            keyManager.listStatus(keyArgs, false, "", fileCountForRead);
-          }
-        } catch (IOException e) {
-          e.printStackTrace();
+    Future<Integer> readFuture = readService.submit(() -> {
+      int count = 0;
+      try {
+        for (int i = 0; i < numOfReadOperations; i++) {
+          FileStatus[] status =
+              fileSystem.listStatus(new Path(readPath));
+          count = +status.length;
         }
+      } catch (IOException e) {
+        LOG.warn("Exception while list status", e);
       }
+      return count;
     });
+    return readFuture;
   }
 
-  private void writeOperations() throws IOException {
+  private Future<Integer> writeOperations() throws Exception {
 
     // Step-3)
     int writeThreadCount =
-        totalThreadCount - ((readThreadPercentage / 100) * totalThreadCount);
+        totalThreadCount - (readThreadPercentage * totalThreadCount) / 100;
 
     String writePath = prefixPath.concat("/").concat("writePath");
     fileSystem.mkdirs(new Path(writePath));
 
     ExecutorService writeService =
         Executors.newFixedThreadPool(writeThreadCount);
-    writeService.execute(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          for (int i = 0; i < numOfWriteOperations; i++) {
-            createFiles(writePath, fileCountForWrite);
-          }
-        } catch (Exception e) {
-          e.printStackTrace();
+
+    Future<Integer> writeFuture = writeService.submit(() -> {
+      int count = 0;
+      try {
+        for (int i = 0; i < numOfWriteOperations; i++) {
+          createFiles(writePath, 1);
+          count++;
         }
+      } catch (IOException e) {
+        LOG.warn("Exception while creating file", e);
       }
+      return count;
     });
+    return writeFuture;
   }
 
   private void createFile(String dir, long counter) throws Exception {
