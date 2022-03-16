@@ -23,8 +23,12 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -32,10 +36,13 @@ import picocli.CommandLine.Option;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 /**
  * Synthetic read/write operations workload generator tool.
@@ -54,11 +61,23 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(OmBucketReadWriteOps.class);
 
-  @Option(names = {"-P", "prefix-path", "--prefixPath"},
-      description = "Prefix path. Full name --prefixPath will be " +
+  @Option(names = {"-v", "--volume"},
+      description = "Name of the volume which contains the test data. Will be"
+          + " created if missing.",
+      defaultValue = "vol1")
+  private String volumeName;
+
+  @Option(names = {"-b", "--bucket"},
+      description = "Name of the bucket which contains the test data. Will be"
+          + " created if missing.",
+      defaultValue = "bucket1")
+  private String bucketName;
+
+  @Option(names = {"-P", "prefix-file-path", "--prefixFilePath"},
+      description = "Prefix file path. Full name --prefixFilePath will be " +
           "removed in later versions.",
-      defaultValue = "o3fs://bucket1.vol1/dir1/dir2")
-  private String prefixPath;
+      defaultValue = "/dir1/dir2")
+  private String prefixFilePath;
 
   @Option(names = {"-r", "--file-count-for-read", "--fileCountForRead"},
       description = "Number of files to be written in the read directory. " +
@@ -81,9 +100,9 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   // do we need a separate fileSizeInBytes for read and write?
 
-  @Option(names = {"-b", "--buffer"},
+  @Option(names = {"-B", "--buffer"},
       description = "Size of buffer used to generated the file content.",
-      defaultValue = "64")
+      defaultValue = "256")
   private int bufferSize;
 
   @Option(names = {"-l", "--name-len", "--nameLen"},
@@ -134,13 +153,19 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   private FileSystem fileSystem;
 
+  private String prefixPath =
+      "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
+
   // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436) in the end.
 
   @Override
   public Void call() throws Exception {
     init();
-
-    LOG.info("prefixFilePath: " + prefixPath);
+    prefixPath =
+        "o3fs://" + bucketName + "." + volumeName + prefixFilePath;
+    LOG.info("volumeName: " + volumeName);
+    LOG.info("bucketName: " + bucketName);
+    LOG.info("prefixFilePath: " + prefixFilePath);
     LOG.info("fileCountForRead: " + fileCountForRead);
     LOG.info("fileCountForWrite: " + fileCountForWrite);
     LOG.info("fileSizeInBytes: " + fileSizeInBytes);
