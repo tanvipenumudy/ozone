@@ -183,7 +183,7 @@ public class OzoneManagerLock {
        */
       int holdCount = manager.getActiveLockCount(resourceName);
       lockFn.accept(resourceName);
-      if (lockType.equals(READ_LOCK)) {
+      if (lockType.equals(READ_LOCK) && holdCount == 0) {
         updateReadLockMetrics(resource, startWaitingTimeNanos);
       } else if (lockType.equals(WRITE_LOCK) && holdCount == 0) {
         updateWriteLockMetrics(resource, startWaitingTimeNanos);
@@ -203,7 +203,7 @@ public class OzoneManagerLock {
         Time.monotonicNowNanos() - startWaitingTimeNanos;
 
     // Adds a snapshot to the metric readLockWaitingTimeMsStat.
-    omLockMetrics.setReadLockWaitingTimeMsStat(
+    setReadLockWaitingTimeMsStat(
         TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
 
     resource.setStartHeldTimeNanos(Time.monotonicNowNanos());
@@ -405,7 +405,7 @@ public class OzoneManagerLock {
      *  holdCount helps in metric updation only once in case of reentrant locks.
      */
     int holdCount = manager.getActiveLockCount(resourceName);
-    if (lockType.equals(READ_LOCK)) {
+    if (lockType.equals(READ_LOCK) && holdCount == 0) {
       updateReadUnlockMetrics(resource);
     } else if (lockType.equals(WRITE_LOCK) && holdCount == 0) {
       updateWriteUnlockMetrics(resource);
@@ -423,7 +423,7 @@ public class OzoneManagerLock {
         Time.monotonicNowNanos() - resource.getStartHeldTimeNanos();
 
     // Adds a snapshot to the metric readLockHeldTimeMsStat.
-    omLockMetrics.setReadLockHeldTimeMsStat(
+    setReadLockHeldTimeMsStat(
         TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
   }
 
@@ -434,6 +434,19 @@ public class OzoneManagerLock {
     // Adds a snapshot to the metric writeLockHeldTimeMsStat.
     omLockMetrics.setWriteLockHeldTimeMsStat(
         TimeUnit.NANOSECONDS.toMillis(writeLockHeldTimeNanos));
+  }
+
+  private final ThreadLocal<OMLockMetrics> readLockStats =
+      ThreadLocal.withInitial(OMLockMetrics::new);
+
+  void setReadLockWaitingTimeMsStat(long readLockWaitingTimeMs){
+    readLockStats.get().setReadLockWaitingTimeMsStat(readLockWaitingTimeMs);
+    System.out.println("Wait " + readLockStats.get().getReadLockWaitingTimeMsStat());
+  }
+
+  void setReadLockHeldTimeMsStat(long readLockHeldTimeMsStat){
+    readLockStats.get().setReadLockHeldTimeMsStat(readLockHeldTimeMsStat);
+    System.out.println("Held " + readLockStats.get().getReadLockHeldTimeMsStat());
   }
 
   /**

@@ -44,7 +44,7 @@ public final class OMLockMetrics implements MetricsSource {
   private final MutableStat writeLockHeldTimeMsStat;
 
 
-  private OMLockMetrics() {
+  OMLockMetrics() {
     registry = new MetricsRegistry(SOURCE_NAME);
     readLockWaitingTimeMsStat = registry.newStat("ReadLockWaitTime",
         "Time (in milliseconds) spent waiting for acquiring the read lock",
