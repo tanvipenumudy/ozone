@@ -38,8 +38,6 @@ public class LockManager<R> {
   private final Map<R, ActiveLock> activeLocks = new ConcurrentHashMap<>();
   private final GenericObjectPool<ActiveLock> lockPool;
 
-//  private final Map<Key, ActiveLock> keyActiveLocks = new ConcurrentHashMap<>();
-
   /**
    * Creates new LockManager instance with the given Configuration.and uses
    * non-fair mode for locks.
