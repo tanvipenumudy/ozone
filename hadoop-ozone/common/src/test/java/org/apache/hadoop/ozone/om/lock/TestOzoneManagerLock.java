@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -374,13 +375,69 @@ public class TestOzoneManagerLock {
     }
   }
 
+  ReentrantReadWriteLock coarseLock = new ReentrantReadWriteLock();
+
+  @Test
+  public void sampleTest() {
+    testLock();
+    testLock();
+    testLock();
+    testLock();
+    testLock();
+    testUnlock();
+    testUnlock();
+    testUnlock();
+    testUnlock();
+    testUnlock();
+  }
+
+  @Test
+  public void sampleTest2() throws InterruptedException {
+
+    final int threadCount = 5;
+    Thread[] threads = new Thread[threadCount];
+    System.out.println(coarseLock.getReadLockCount());
+    for (int i = 0; i < threads.length; i++) {
+      int finalI = i;
+      threads[i] = new Thread(() -> {
+        testLock();
+        System.out.println("Lock " + coarseLock.getReadLockCount() + " " + Thread.currentThread().getName());
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        testUnlock();
+        System.out.println("Unlock " + coarseLock.getReadLockCount() + " " + Thread.currentThread().getName());
+      });
+      threads[i].start();
+    }
+    for (Thread t : threads) {
+      t.join();
+    }
+    System.out.println(coarseLock.getReadLockCount());
+  }
+
+
+  public void testLock() {
+    coarseLock.readLock().lock();
+    int count = coarseLock.getReadLockCount();
+    //System.out.println("count = " + count);
+  }
+
+  public void testUnlock() {
+    coarseLock.readLock().unlock();
+    int count = coarseLock.getReadLockCount();
+    //System.out.println("count = " + count);
+  }
+
   private void testLockHoldCountUtil(OzoneManagerLock.Resource resource,
                                      String[] resourceName,
                                      String resourceLockName) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    /*lock.acquireWriteLock(resource, resourceName);
-    lock.acquireWriteLock(resource, resourceName);*/
+    lock.acquireWriteLock(resource, resourceName);
+    lock.acquireWriteLock(resource, resourceName);
     lock.acquireReadLock(resource, resourceName);
     lock.acquireReadLock(resource, resourceName);
     lock.acquireReadLock(resource, resourceName);
@@ -389,15 +446,15 @@ public class TestOzoneManagerLock {
     lock.releaseReadLock(resource, resourceName);
     lock.releaseReadLock(resource, resourceName);
     lock.releaseReadLock(resource, resourceName);
-    /*lock.releaseWriteLock(resource, resourceName);
-    lock.releaseWriteLock(resource, resourceName);*/
+    lock.releaseWriteLock(resource, resourceName);
+    lock.releaseWriteLock(resource, resourceName);
 
     System.out.println(
         "getReadLockHeldTimeMsStat() -> " + lock.getReadLockHeldTimeMsStat());
     System.out.println("getReadLockWaitingTimeMsStat() -> " +
         lock.getReadLockWaitingTimeMsStat());
 
-    /*System.out.println(
+    System.out.println(
         "getWriteLockHeldTimeMsStat() -> " + lock.getWriteLockHeldTimeMsStat());
     System.out.println("getWriteLockWaitingTimeMsStat() -> " +
         lock.getWriteLockWaitingTimeMsStat());
@@ -422,7 +479,7 @@ public class TestOzoneManagerLock {
     for (int i = 4; i >= 0; i--) {
       lock.releaseWriteLock(resource, resourceName);
       assertEquals(i, lock.getHoldCount(resourceLockName));
-    }*/
+    }
   }
 
   @Test
