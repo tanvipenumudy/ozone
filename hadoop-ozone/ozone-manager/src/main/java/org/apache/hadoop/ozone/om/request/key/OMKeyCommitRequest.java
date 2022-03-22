@@ -133,7 +133,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OmKeyInfo omKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
-    boolean bucketLockAcquired = false;
+    boolean acquiredLock = false;
     Result result;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -168,9 +168,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         locationInfoList.add(locationInfo);
       }
 
-      bucketLockAcquired =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      acquiredLock =
+          acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+              omMetadataManager);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -267,9 +267,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
 
-      if (bucketLockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+      if (acquiredLock) {
+        try {
+          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+              omMetadataManager);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 
