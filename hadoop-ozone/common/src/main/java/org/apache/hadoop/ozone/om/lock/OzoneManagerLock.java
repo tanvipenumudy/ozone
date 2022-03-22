@@ -499,7 +499,9 @@ public class OzoneManagerLock {
     USER_LOCK((byte) 3, "USER_LOCK"), // 15
 
     S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
-    PREFIX_LOCK((byte) 5, "PREFIX_LOCK"); //63
+    PREFIX_LOCK((byte) 5, "PREFIX_LOCK"), //63
+    KEY_PREFIX_LOCK((byte) 6, "KEY_PREFIX_LOCK"); //127
+    // for key prefix lock do we need to allow other locks?
 
     // level of the resource
     private byte lockLevel;
