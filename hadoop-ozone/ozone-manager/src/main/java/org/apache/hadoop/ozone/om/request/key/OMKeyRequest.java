@@ -803,15 +803,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
                                               String bucketName, String keyName,
                                               OMMetadataManager omMetadataManager)
       throws IOException {
+
     boolean acquiredLock =
         omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
             volumeName, bucketName);
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
-    if (acquiredLock) {
-      acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(KEY_PREFIX_LOCK,
-              volumeName, bucketName, keyName);
-    }
+
+    Preconditions.checkArgument(acquiredLock,
+        "BUCKET_LOCK should be acquired!");
+
+    acquiredLock =
+        omMetadataManager.getLock().acquireWriteLock(KEY_PREFIX_LOCK,
+            volumeName, bucketName, keyName);
     return acquiredLock;
   }
 
@@ -822,6 +825,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     omMetadataManager.getLock().releaseWriteLock(KEY_PREFIX_LOCK,
         volumeName, bucketName, keyName);
+
     omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
         volumeName, bucketName);
     return;

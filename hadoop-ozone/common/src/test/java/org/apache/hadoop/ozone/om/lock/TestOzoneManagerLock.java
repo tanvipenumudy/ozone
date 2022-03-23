@@ -383,6 +383,20 @@ public class TestOzoneManagerLock {
 
     assertEquals(0, lock.getHoldCount(resourceLockName));
 
+    // test-case-1
+    // "/a/b/c/d/key1 - RLock - 1st iteration"
+    // "/a/b/c/d/key1 - RLock - 2nd iteration"
+    // "/a/b/c/d/key1 - RLock - 3rd iteration"
+    // "/a/b/c/d/key1 - WLock - 1st iteration" -- blocked
+
+    // test-case-2
+    // "/a/b/c/d/key1 - WLock - 1st iteration"
+    // "/a/b/c/d/key1 - WLock - 2nd iteration"  -- blocked
+
+    // test-case-3
+    // "/a/b/c/d/key1 - WLock - 1st iteration"
+    // "/a/b/c/d/key2 - WLock - 2nd iteration"  -- allowed
+
     for (int i = 1; i <= 5; i++) {
       lock.acquireReadLock(resource, resourceName);
       assertEquals(i, lock.getHoldCount(resourceLockName));

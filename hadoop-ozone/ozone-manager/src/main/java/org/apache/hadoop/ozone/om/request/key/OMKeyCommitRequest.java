@@ -172,7 +172,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
               omMetadataManager);
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
