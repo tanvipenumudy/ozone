@@ -88,6 +88,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PREFIX_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -801,5 +802,97 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
           trxnLogIndex, isRatisEnabled);
+  }
+
+  protected boolean acquireWriteKeyPrefixLock(String volumeName,
+                                              String bucketName, String keyName,
+                                              OMMetadataManager omMetadataManager,
+                                              boolean enableFileSystemPaths)
+      throws IOException {
+
+    boolean acquiredLock;
+
+    if (!enableFileSystemPaths) {
+      acquiredLock = omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+          volumeName, bucketName);
+      OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+
+      Preconditions.checkArgument(acquiredLock,
+          "BUCKET_LOCK should be acquired!");
+
+      acquiredLock =
+          omMetadataManager.getLock().acquireWriteLock(KEY_PREFIX_LOCK,
+              volumeName, bucketName, keyName);
+    } else {
+      acquiredLock =
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName);
+      OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    }
+    return acquiredLock;
+  }
+
+  protected void releaseWriteKeyPrefixLock(String volumeName,
+                                           String bucketName, String keyName,
+                                           OMMetadataManager omMetadataManager,
+                                           boolean enableFileSystemPaths)
+      throws IOException {
+
+    if (!enableFileSystemPaths) {
+      omMetadataManager.getLock().releaseWriteLock(KEY_PREFIX_LOCK,
+          volumeName, bucketName, keyName);
+
+      omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
+          volumeName, bucketName);
+    } else {
+      omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+          volumeName, bucketName);
+    }
+    return;
+  }
+
+  protected boolean acquireReadKeyPrefixLock(String volumeName,
+                                             String bucketName, String keyName,
+                                             OMMetadataManager omMetadataManager,
+                                             boolean enableFileSystemPaths)
+      throws IOException {
+
+    boolean acquiredLock;
+    if (!enableFileSystemPaths) {
+      acquiredLock = omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+          volumeName, bucketName);
+      OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+
+      Preconditions.checkArgument(acquiredLock,
+          "BUCKET_LOCK should be acquired!");
+
+      acquiredLock =
+          omMetadataManager.getLock().acquireReadLock(KEY_PREFIX_LOCK,
+              volumeName, bucketName, keyName);
+    } else {
+      acquiredLock =
+          omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+              volumeName, bucketName);
+      OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
+    }
+    return acquiredLock;
+  }
+
+  protected void releaseReadKeyPrefixLock(String volumeName,
+                                          String bucketName, String keyName,
+                                          OMMetadataManager omMetadataManager,
+                                          boolean enableFileSystemPaths)
+      throws IOException {
+
+    if (!enableFileSystemPaths) {
+      omMetadataManager.getLock().releaseReadLock(KEY_PREFIX_LOCK,
+          volumeName, bucketName, keyName);
+      omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
+          volumeName, bucketName);
+    } else {
+      omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
+          volumeName, bucketName);
+    }
+    return;
   }
 }
