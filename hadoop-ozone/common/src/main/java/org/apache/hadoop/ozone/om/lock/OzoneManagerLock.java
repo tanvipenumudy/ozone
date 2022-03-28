@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -194,7 +195,7 @@ public class OzoneManagerLock {
     } else if (resources.length == 2 && resource == Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateBucketLockName(resources[0],
           resources[1]);
-    } else if (resources.length == 3 && resource == Resource.KEY_PREFIX_LOCK) {
+    } else if (resources.length == 3 && resource == Resource.KEY_LOCK) {
       return OzoneManagerLockUtil.generateKeyPrefixLockName(resources[0],
           resources[1], resources[2]);
     } else {
@@ -210,7 +211,8 @@ public class OzoneManagerLock {
 
   }
 
-  private List<String> getCurrentLocks() {
+  @VisibleForTesting
+  List<String> getCurrentLocks() {
     List<String> currentLocks = new ArrayList<>();
     short lockSetVal = lockSet.get();
     for (Resource value : Resource.values()) {
@@ -387,12 +389,14 @@ public class OzoneManagerLock {
     // is equal to 100 + 010 + 001 = 111 = 4 + 2 + 1 = 7
     BUCKET_LOCK((byte) 2, "BUCKET_LOCK"), // = 4
 
+    KEY_LOCK((byte) 3, "KEY_LOCK"), //63
+
     // For user we need to allow s3 bucket, volume, bucket and user lock.
     // Which is 8  4 + 2 + 1 = 15
-    USER_LOCK((byte) 3, "USER_LOCK"), // 15
+    USER_LOCK((byte) 4, "USER_LOCK"), // 15
 
-    S3_SECRET_LOCK((byte) 4, "S3_SECRET_LOCK"), // 31
-    KEY_PREFIX_LOCK((byte) 5, "KEY_PREFIX_LOCK"), //63
+    S3_SECRET_LOCK((byte) 5, "S3_SECRET_LOCK"), // 31
+
     PREFIX_LOCK((byte) 6, "PREFIX_LOCK"); //127
 
     // level of the resource

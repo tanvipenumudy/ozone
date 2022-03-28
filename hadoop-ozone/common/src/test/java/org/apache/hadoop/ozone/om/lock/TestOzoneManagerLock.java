@@ -22,13 +22,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.Assert.fail;
 
@@ -36,6 +42,13 @@ import static org.junit.Assert.fail;
  * Class tests OzoneManagerLock.
  */
 public class TestOzoneManagerLock {
+
+  @Rule
+  public Timeout timeout = Timeout.seconds(100);
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneManagerLock.class);
+
   @Test
   public void acquireResourceLock() {
     String[] resourceName;
@@ -209,7 +222,7 @@ public class TestOzoneManagerLock {
     if (resource == OzoneManagerLock.Resource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString()};
-    } else if (resource == OzoneManagerLock.Resource.KEY_PREFIX_LOCK) {
+    } else if (resource == OzoneManagerLock.Resource.KEY_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString(), UUID.randomUUID().toString()};
     } else {
@@ -347,20 +360,49 @@ public class TestOzoneManagerLock {
   }
 
   @Test
-  public void testKeyPrefixLockMultiThreading() throws InterruptedException {
-    long timeElapsedTestCase1 = testKeyPrefixLockCase1(), timeElapsedTestCase2 =
-        testKeyPrefixLockCase2(), timeElapsedTestCase3 =
-        testKeyPrefixLockCase3(), timeElapsedTestCase4 =
-        testKeyPrefixLockCase4();
+  public void testKeyPrefixLockMultiThreading() throws Exception {
 
-    Assert.assertTrue("Test Case-1 Time Elapsed (" + timeElapsedTestCase1 +
-            ") should be greater than Test Case-2 Time Elapsed (" +
-            timeElapsedTestCase2 + ")",
-        timeElapsedTestCase1 > timeElapsedTestCase2);
-    Assert.assertTrue("Test Case-4 Time Elapsed (" + timeElapsedTestCase4 +
-            ") should be greater than Test Case-3 Time Elapsed (" +
-            timeElapsedTestCase3 + ")",
-        timeElapsedTestCase4 > timeElapsedTestCase3);
+    testSameKeyPathWriteLockWithMultiThreading(100, 1000); // 50, 500/1000
+    testDiffKeyPathWriteLockWithMultiThreading(100, 100); // 50, 500/1000
+    testKeyLockCase11(50, 100);
+    testKeyLockCase3(50, 100);
+    // Concurrent thread operations:
+    // case-1 : Read only with same key Path - All are ALLOWED
+    // case-2 : Read only with diff key Path - All are ALLOWED
+    // case-3 : Read and Write on diff key Path - All are ALLOWED
+    // case-4 : Read and Write on same key Path - 2nd op should be BLOCKED
+    // case-5 : Write and Read on same key Path - 2nd op should be BLOCKED
+    // case-6 : Write and Read on diff key Path - All are ALLOWED
+    // case-7 : Acquired Read Lock on KeyPath and trying to acquire a Read Bucket Lock on the same Key's bucket.
+    // For ex: Read Lock = /vol1/buck1/a/b/c/d/key1 and then try to acquire a Read Bucket Lock on "/vol1/buck1" - All are ALLOWED
+    // case-8 : Acquired Read Lock on KeyPath and trying to acquire a Write Bucket Lock on the same Key's bucket.
+    // For ex: Read Lock = /vol1/buck1/a/b/c/d/key1 and then try to acquire a Write Bucket Lock on "/vol1/buck1" - and op should be BLOCKED
+    // case-9 : Acquired Read Lock on KeyPath and trying to acquire a Write Bucket Lock on the same Key's bucket.
+    // For ex: Read Lock = /vol1/buck1/a/b/c/d/key1 and then try to acquire a Write Bucket Lock on "/vol1/buck1" - and op should be BLOCKED
+    // case-10 : Acquired Write Lock on KeyPath and trying to acquire a Read Bucket Lock on the same Key's bucket.
+    // For ex: Write Lock = /vol1/buck1/a/b/c/d/key1 and then try to acquire a Read Bucket Lock on "/vol1/buck1" - All are ALLOWED
+    // case-11 : Acquired Write Lock on KeyPath and trying to acquire a Write Bucket Lock on the same Key's bucket.
+    // For ex: Write Lock = /vol1/buck1/a/b/c/d/key1 and then try to acquire a Write Bucket Lock on "/vol1/buck1" -  op should be BLOCKED
+
+    // Reenterant operations by same thread cases:
+
+
+    //Your Question: How do we proceed with the changes in community? am I correct?
+    // We will split the task into multiple sub-tasks and then prioritize similar to the metrics patch.
+    // We will create an umbrella jira and create smaller sub-tasks.
+
+  }
+
+  class Counter {
+    private int count = 0;
+
+    public void incrementCount() {
+      count++;
+    }
+
+    public int getCount() {
+      return count;
+    }
   }
 
   // test-case-1
@@ -372,13 +414,11 @@ public class TestOzoneManagerLock {
 
   // Expected Time Elapsed: >=5000 ms (since the iterations are sequential)
 
-  public long testKeyPrefixLockCase1() throws InterruptedException {
-
-    System.out.println("\n---------Test Case: 1---------");
-    final int threadCount = 5;
+  public void testSameKeyPathWriteLockWithMultiThreading(int threadCount, int iterations)
+      throws InterruptedException {
 
     OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PREFIX_LOCK;
+        OzoneManagerLock.Resource.KEY_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -387,35 +427,69 @@ public class TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
     Thread[] threads = new Thread[threadCount];
-    long startTime = Time.monotonicNow();
+    Counter counter = new Counter();
+    CountDownLatch countDownLatch = new CountDownLatch(threadCount);
+    List<Integer> listTokens = new ArrayList<>(threadCount);
 
     for (int i = 0; i < threads.length; i++) {
 
       threads[i] = new Thread(() -> {
         String[] sampleResourceName =
             new String[]{volumeName, bucketName, keyName};
-        lock.acquireWriteLock(resource, sampleResourceName);
-        System.out.println(
-            "Write Lock Acquired by " + Thread.currentThread().getName());
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+
+        // Waiting all threads to be instantiated and reached to the acquireWriteLock.
+        countDownLatch.countDown();
+        while (countDownLatch.getCount() > 0) {
+          try {
+            Thread.sleep(500);
+            LOG.info("countDown.getCount() -> " + countDownLatch.getCount());
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
+
+        // Now, all threads have been instantiated.
+        Assert.assertEquals(0, countDownLatch.getCount());
+
+        lock.acquireWriteLock(resource, sampleResourceName);
+        LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
+
+        /**
+         * Critical Section. count = count + 1;
+         */
+        for (int idx = 0; idx < iterations; idx++) {
+          counter.incrementCount();
+        }
+        /* Sequence of tokens ranging from 1-100 for each thread.
+        For example:
+         Thread-1 -> 1-100
+         Thread-2 -> 101-200 and so on.
+         */
+        listTokens.add(counter.getCount());
+
         lock.releaseWriteLock(resource, sampleResourceName);
-        System.out.println(
-            "Write Lock Released by " + Thread.currentThread().getName());
+        LOG.info("Write Lock Released by " + Thread.currentThread().getName());
       });
+
       threads[i].start();
     }
 
+    // Waiting for all threads to finish the execution(run method).
     for (Thread t : threads) {
       t.join();
     }
 
-    long endTime = Time.monotonicNow() - startTime;
-    System.out.println("Test Case-1 Time Elapsed: " + endTime);
-    return endTime;
+    // For example, threadCount = 50, iterations = 100. Exoected counter value is 50 * 100
+    Assert.assertEquals(threadCount * iterations, counter.getCount());
+    Assert.assertEquals(threadCount, listTokens.size());
+
+    /**
+     * Thread-1 = 100,
+     * Thread-2 = 200 and so on.
+     */
+    for (int i = 1; i <= listTokens.size(); i++) {
+      Assert.assertEquals((new Integer(i * iterations)), listTokens.get(i - 1));
+    }
   }
 
   // test-case-2
@@ -427,13 +501,12 @@ public class TestOzoneManagerLock {
 
   // Expected Time Elapsed: >=1000 ms (since the iterations are parallel)
 
-  public long testKeyPrefixLockCase2() throws InterruptedException {
-
-    System.out.println("\n---------Test Case: 2---------");
-    final int threadCount = 5;
+  public void testDiffKeyPathWriteLockWithMultiThreading(int threadCount,
+                                                         int iterations)
+      throws Exception {
 
     OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PREFIX_LOCK;
+        OzoneManagerLock.Resource.KEY_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -441,25 +514,101 @@ public class TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
     Thread[] threads = new Thread[threadCount];
-    long startTime = Time.monotonicNow();
+    Counter counter = new Counter();
+    CountDownLatch countDown = new CountDownLatch(threadCount);
 
     for (int i = 0; i < threads.length; i++) {
 
       threads[i] = new Thread(() -> {
+        String keyName = UUID.randomUUID().toString();
         String[] sampleResourceName =
-            new String[]{volumeName, bucketName, UUID.randomUUID().toString()};
+            new String[]{volumeName, bucketName, keyName};
+
         lock.acquireWriteLock(resource, sampleResourceName);
-        System.out.println(
-            "Write Lock Acquired by " + Thread.currentThread().getName());
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
+
+        countDown.countDown();
+        while (countDown.getCount() > 0) {
+          try {
+            Thread.sleep(500);
+            LOG.info("countDown.getCount() -> " + countDown.getCount());
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
+
+        Assert.assertEquals(1, lock.getCurrentLocks().size());
+
         lock.releaseWriteLock(resource, sampleResourceName);
-        System.out.println(
-            "Write Lock Released by " + Thread.currentThread().getName());
+        LOG.info("Write Lock Released by " + Thread.currentThread().getName());
       });
+
+      threads[i].start();
+    }
+
+    /**
+     * Waiting for all the threads to count down
+     */
+    GenericTestUtils.waitFor(() -> {
+          if (countDown.getCount() > 0) {
+            LOG.info("Waiting for the trheads to count down {} ",
+                countDown.getCount());
+            return false;
+          }
+          return true; // all thrads has finished counting down.
+        }, 3000,
+        120000); // 2 minutes
+
+    Assert.assertEquals(0, countDown.getCount());
+
+    for (Thread t : threads) {
+      t.join();
+    }
+
+    LOG.info("Expected=" + threadCount * iterations + ", Actual=" +
+        counter.getCount());
+  }
+
+  public void testKeyLockCase11(int threadCount, int iterations)
+      throws InterruptedException {
+
+    System.out.println("--------Test Case 3--------");
+
+    OzoneManagerLock.Resource resource =
+        OzoneManagerLock.Resource.KEY_LOCK;
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    Thread[] threads = new Thread[threadCount];
+    Counter counter = new Counter();
+
+    for (int i = 0; i < threads.length; i++) {
+
+      int finalI = i;
+      threads[i] = new Thread(() -> {
+        String[] sampleResourceName =
+            new String[]{volumeName, bucketName, keyName};
+
+        lock.acquireWriteLock(resource, sampleResourceName);
+        LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
+
+//        System.out.println("I " + finalI + " " + Thread.activeCount());
+
+        /**
+         * Critical Section. count = count + 1;
+         */
+        for (int idx = 0; idx < iterations; idx++) {
+          counter.incrementCount();
+        }
+
+        lock.releaseWriteLock(resource, sampleResourceName);
+        LOG.info("Write Lock Released by " + Thread.currentThread().getName());
+      });
+
       threads[i].start();
     }
 
@@ -467,9 +616,7 @@ public class TestOzoneManagerLock {
       t.join();
     }
 
-    long endTime = Time.monotonicNow() - startTime;
-    System.out.println("Test Case-2 Time Elapsed: " + endTime);
-    return endTime;
+    Assert.assertEquals(threadCount * iterations, counter.getCount());
   }
 
   // test-case-3
@@ -482,13 +629,10 @@ public class TestOzoneManagerLock {
   // Expected Time Elapsed: >=1000 ms (since the RLock iterations are parallel,
   // WLock iteration is on a different key path)
 
-  public long testKeyPrefixLockCase3() throws InterruptedException {
-
-    System.out.println("\n---------Test Case: 3---------");
-    final int threadCount = 5;
+  public void testKeyLockCase3(int threadCount, int iterations) throws InterruptedException {
 
     OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PREFIX_LOCK;
+        OzoneManagerLock.Resource.KEY_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -497,25 +641,44 @@ public class TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
     Thread[] threads = new Thread[threadCount];
-    long startTime = Time.monotonicNow();
+    Counter counter = new Counter();
+    CountDownLatch countDownLatch = new CountDownLatch(threadCount-1);
+    List<Integer> listTokens = new ArrayList<>(threadCount);
 
     for (int i = 0; i < threads.length-1; i++) {
 
       threads[i] = new Thread(() -> {
         String[] sampleResourceName =
             new String[]{volumeName, bucketName, keyName};
-        lock.acquireReadLock(resource, sampleResourceName);
-        System.out.println(
-            "Read Lock Acquired by " + Thread.currentThread().getName());
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+
+        countDownLatch.countDown();
+        while (countDownLatch.getCount() > 0) {
+          try {
+            Thread.sleep(500);
+            LOG.info("countDown.getCount() -> " + countDownLatch.getCount());
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
+
+        // Now, all threads have been instantiated.
+        Assert.assertEquals(0, countDownLatch.getCount());
+
+        lock.acquireReadLock(resource, sampleResourceName);
+        LOG.info("Read Lock Acquired by " + Thread.currentThread().getName());
+
+        /**
+         * Critical Section. count = count + 1;
+         */
+        for (int idx = 0; idx < iterations; idx++) {
+          counter.incrementCount();
+        }
+        listTokens.add(counter.getCount());
+
         lock.releaseReadLock(resource, sampleResourceName);
-        System.out.println(
-            "Read Lock Released by " + Thread.currentThread().getName());
+        LOG.info("Read Lock Released by " + Thread.currentThread().getName());
       });
+
       threads[i].start();
     }
 
@@ -523,16 +686,14 @@ public class TestOzoneManagerLock {
       String[] sampleResourceName =
           new String[]{volumeName, bucketName, UUID.randomUUID().toString()};
       lock.acquireWriteLock(resource, sampleResourceName);
-        System.out.println(
-            "Write Lock Acquired by " + Thread.currentThread().getName());
+        LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
       lock.releaseWriteLock(resource, sampleResourceName);
-        System.out.println(
-            "Write Lock Released by " + Thread.currentThread().getName());
+        LOG.info("Write Lock Released by " + Thread.currentThread().getName());
     });
     threads[threads.length-1].start();
 
@@ -540,12 +701,14 @@ public class TestOzoneManagerLock {
       t.join();
     }
 
-    long endTime = Time.monotonicNow() - startTime;
-    System.out.println("Test Case-3 Time Elapsed: " + endTime);
-    return endTime;
+    System.out.println(threadCount-1 + " " + listTokens.size());
+
+    for (int i = 1; i <= listTokens.size(); i++) {
+      System.out.println((new Integer(i * iterations)) + " " + listTokens.get(i - 1));
+    }
   }
 
-// test-case-4
+  // test-case-4
   // "/a/b/c/d/key1 - RLock - 1st iteration"
   // "/a/b/c/d/key1 - RLock - 2nd iteration"
   // "/a/b/c/d/key1 - RLock - 3rd iteration"
@@ -555,13 +718,13 @@ public class TestOzoneManagerLock {
   // Expected Time Elapsed: >=2000/3000 ms (since the RLock iterations are parallel,
   // WLock iteration is sequential on the same key path)
 
-  public long testKeyPrefixLockCase4() throws InterruptedException {
+  public long testKeyLockCase4() throws InterruptedException {
 
     System.out.println("\n---------Test Case: 4---------");
     final int threadCount = 5;
 
     OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PREFIX_LOCK;
+        OzoneManagerLock.Resource.KEY_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

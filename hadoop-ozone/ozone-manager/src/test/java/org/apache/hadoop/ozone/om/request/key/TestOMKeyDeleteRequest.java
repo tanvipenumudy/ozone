@@ -79,6 +79,64 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   @Test
+  public void testOMKeyDeleteRequestMultiThreading() throws Exception {
+    testKeyLockCase1(100);
+  }
+
+  public void testKeyLockCase1(int threadCount) throws Exception {
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).get(ozoneKey);
+
+    Assert.assertNotNull(omKeyInfo);
+
+    Thread[] threads = new Thread[threadCount];
+    final int[] expectedFailureCount = {0};
+
+    for (int i = 0; i < threads.length; i++) {
+
+      threads[i] = new Thread(() -> {
+        OMRequest modifiedOmRequest = null;
+
+        try {
+          modifiedOmRequest = doPreExecute(createDeleteKeyRequest());
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+
+        OMKeyDeleteRequest omKeyDeleteRequest =
+            getOmKeyDeleteRequest(modifiedOmRequest);
+
+        OMClientResponse omClientResponse =
+            omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
+                100L, ozoneManagerDoubleBufferHelper,
+                BucketLayout.OBJECT_STORE);
+
+        if (omClientResponse.getOMResponse().getStatus() ==
+            OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND) {
+          expectedFailureCount[0]++;
+        }
+      });
+
+      threads[i].start();
+    }
+
+    for (Thread t : threads) {
+      t.join();
+    }
+
+    omKeyInfo =
+        omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).get(ozoneKey);
+
+    Assert.assertNull(omKeyInfo);
+    Assert.assertEquals(threadCount - 1, expectedFailureCount[0]);
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
     OMRequest modifiedOmRequest =
         doPreExecute(createDeleteKeyRequest());

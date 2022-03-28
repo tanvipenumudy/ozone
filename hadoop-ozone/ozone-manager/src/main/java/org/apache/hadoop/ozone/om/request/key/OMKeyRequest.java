@@ -88,7 +88,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PREFIX_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -821,7 +821,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           "BUCKET_LOCK should be acquired!");
 
       acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(KEY_PREFIX_LOCK,
+          omMetadataManager.getLock().acquireWriteLock(KEY_LOCK,
               volumeName, bucketName, keyName);
     } else {
       acquiredLock =
@@ -839,7 +839,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throws IOException {
 
     if (!enableFileSystemPaths) {
-      omMetadataManager.getLock().releaseWriteLock(KEY_PREFIX_LOCK,
+      omMetadataManager.getLock().releaseWriteLock(KEY_LOCK,
           volumeName, bucketName, keyName);
 
       omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
@@ -867,7 +867,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           "BUCKET_LOCK should be acquired!");
 
       acquiredLock =
-          omMetadataManager.getLock().acquireReadLock(KEY_PREFIX_LOCK,
+          omMetadataManager.getLock().acquireReadLock(KEY_LOCK,
               volumeName, bucketName, keyName);
     } else {
       acquiredLock =
@@ -885,7 +885,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throws IOException {
 
     if (!enableFileSystemPaths) {
-      omMetadataManager.getLock().releaseReadLock(KEY_PREFIX_LOCK,
+      omMetadataManager.getLock().releaseReadLock(KEY_LOCK,
           volumeName, bucketName, keyName);
       omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
           volumeName, bucketName);

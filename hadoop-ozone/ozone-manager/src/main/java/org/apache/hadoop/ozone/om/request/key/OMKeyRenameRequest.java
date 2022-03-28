@@ -153,11 +153,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-
-      // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      acquiredLock =
+          acquireWriteKeyPrefixLock(volumeName, bucketName, fromKeyName,
+              omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       // Check if toKey exists
       fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
@@ -212,8 +210,12 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        try {
+          releaseWriteKeyPrefixLock(volumeName, bucketName, fromKeyName,
+              omMetadataManager, ozoneManager.getEnableFileSystemPaths());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 
