@@ -175,10 +175,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
       }
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       Path keyPath = Paths.get(keyName);
 
@@ -231,8 +229,12 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        try {
+          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+              omMetadataManager, ozoneManager.getEnableFileSystemPaths());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 

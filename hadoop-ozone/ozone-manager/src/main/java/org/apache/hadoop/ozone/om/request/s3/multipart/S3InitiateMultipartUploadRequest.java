@@ -122,7 +122,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     ozoneManager.getMetrics().incNumInitiateMultipartUploads();
-    boolean acquiredBucketLock = false;
+    boolean acquiredLock = false;
     IOException exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
@@ -141,11 +141,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquiredBucketLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
-
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -231,9 +228,13 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
-      if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            volumeName, bucketName);
+      if (acquiredLock) {
+        try {
+          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+              omMetadataManager, ozoneManager.getEnableFileSystemPaths());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
     logResult(ozoneManager, multipartInfoInitiateRequest, auditMap, volumeName,

@@ -134,10 +134,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = getMultipartKey(volumeName, bucketName, keyName,
@@ -253,8 +251,12 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            volumeName, bucketName);
+        try {
+          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+              omMetadataManager, ozoneManager.getEnableFileSystemPaths());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 
