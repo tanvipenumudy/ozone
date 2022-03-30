@@ -63,7 +63,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles CommitKey request.
@@ -169,7 +168,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       acquiredLock =
-          acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          acquireWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -268,7 +267,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       if (acquiredLock) {
         try {
-          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
         } catch (IOException e) {
           e.printStackTrace();

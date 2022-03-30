@@ -69,7 +69,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handle Multipart upload complete request.
@@ -143,7 +142,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+      acquiredLock = acquireWriteKeyPathLock(volumeName, bucketName, keyName,
           omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
@@ -275,7 +274,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquiredLock) {
         try {
-          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
         } catch (IOException e) {
           e.printStackTrace();

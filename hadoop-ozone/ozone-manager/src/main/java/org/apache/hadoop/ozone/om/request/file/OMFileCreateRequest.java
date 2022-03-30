@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
@@ -213,7 +212,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+      acquiredLock = acquireWriteKeyPathLock(volumeName, bucketName, keyName,
           omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       if (keyName.length() == 0) {
@@ -315,7 +314,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquiredLock) {
         try {
-          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
         } catch (IOException e) {
           e.printStackTrace();

@@ -88,7 +88,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PATH_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -804,10 +804,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
           trxnLogIndex, isRatisEnabled);
   }
 
-  protected boolean acquireWriteKeyPrefixLock(String volumeName,
-                                              String bucketName, String keyName,
-                                              OMMetadataManager omMetadataManager,
-                                              boolean enableFileSystemPaths)
+  protected boolean acquireWriteKeyPathLock(String volumeName,
+                                            String bucketName, String keyName,
+                                            OMMetadataManager omMetadataManager,
+                                            boolean enableFileSystemPaths)
       throws IOException {
 
     boolean acquiredLock;
@@ -821,7 +821,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           "BUCKET_LOCK should be acquired!");
 
       acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(KEY_LOCK,
+          omMetadataManager.getLock().acquireWriteLock(KEY_PATH_LOCK,
               volumeName, bucketName, keyName);
     } else {
       acquiredLock =
@@ -832,14 +832,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return acquiredLock;
   }
 
-  protected void releaseWriteKeyPrefixLock(String volumeName,
-                                           String bucketName, String keyName,
-                                           OMMetadataManager omMetadataManager,
-                                           boolean enableFileSystemPaths)
+  protected void releaseWriteKeyPathLock(String volumeName,
+                                         String bucketName, String keyName,
+                                         OMMetadataManager omMetadataManager,
+                                         boolean enableFileSystemPaths)
       throws IOException {
 
     if (!enableFileSystemPaths) {
-      omMetadataManager.getLock().releaseWriteLock(KEY_LOCK,
+      omMetadataManager.getLock().releaseWriteLock(KEY_PATH_LOCK,
           volumeName, bucketName, keyName);
 
       omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
@@ -851,7 +851,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return;
   }
 
-  protected boolean acquireReadKeyPrefixLock(String volumeName,
+  protected boolean acquireReadKeyPathLock(String volumeName,
                                              String bucketName, String keyName,
                                              OMMetadataManager omMetadataManager,
                                              boolean enableFileSystemPaths)
@@ -867,7 +867,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           "BUCKET_LOCK should be acquired!");
 
       acquiredLock =
-          omMetadataManager.getLock().acquireReadLock(KEY_LOCK,
+          omMetadataManager.getLock().acquireReadLock(KEY_PATH_LOCK,
               volumeName, bucketName, keyName);
     } else {
       acquiredLock =
@@ -878,14 +878,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return acquiredLock;
   }
 
-  protected void releaseReadKeyPrefixLock(String volumeName,
+  protected void releaseReadKeyPathLock(String volumeName,
                                           String bucketName, String keyName,
                                           OMMetadataManager omMetadataManager,
                                           boolean enableFileSystemPaths)
       throws IOException {
 
     if (!enableFileSystemPaths) {
-      omMetadataManager.getLock().releaseReadLock(KEY_LOCK,
+      omMetadataManager.getLock().releaseReadLock(KEY_PATH_LOCK,
           volumeName, bucketName, keyName);
       omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK,
           volumeName, bucketName);

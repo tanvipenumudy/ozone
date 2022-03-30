@@ -62,7 +62,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handle Multipart upload commit upload part file.
@@ -134,7 +133,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+      acquiredLock = acquireWriteKeyPathLock(volumeName, bucketName, keyName,
           omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       String uploadID = keyArgs.getMultipartUploadID();
@@ -252,7 +251,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquiredLock) {
         try {
-          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
         } catch (IOException e) {
           e.printStackTrace();

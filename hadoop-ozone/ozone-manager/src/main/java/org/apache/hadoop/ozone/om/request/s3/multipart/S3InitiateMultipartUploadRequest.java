@@ -57,8 +57,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-
 /**
  * Handles initiate multipart upload request.
  */
@@ -141,7 +139,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+      acquiredLock = acquireWriteKeyPathLock(volumeName, bucketName, keyName,
           omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       // We are adding uploadId to key, because if multiple users try to
@@ -230,7 +228,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
         try {
-          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
         } catch (IOException e) {
           e.printStackTrace();

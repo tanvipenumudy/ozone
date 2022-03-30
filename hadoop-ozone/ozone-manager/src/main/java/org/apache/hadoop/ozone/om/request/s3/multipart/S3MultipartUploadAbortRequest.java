@@ -55,8 +55,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-
 /**
  * Handles Abort of multipart upload request.
  */
@@ -125,7 +123,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
-      acquiredLock = acquireWriteKeyPrefixLock(volumeName, bucketName, keyName,
+      acquiredLock = acquireWriteKeyPathLock(volumeName, bucketName, keyName,
           omMetadataManager, ozoneManager.getEnableFileSystemPaths());
 
       multipartKey = omMetadataManager.getMultipartKey(
@@ -196,7 +194,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquiredLock) {
         try {
-          releaseWriteKeyPrefixLock(volumeName, bucketName, keyName,
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
               omMetadataManager, ozoneManager.getEnableFileSystemPaths());
         } catch (IOException e) {
           e.printStackTrace();

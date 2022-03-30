@@ -72,7 +72,7 @@ final class OzoneManagerLockUtil {
   }
 
   // can bucketID be used instead?
-  public static String generateKeyPrefixLockName(String volumeName,
+  public static String generateKeyPathLockName(String volumeName,
                                                  String bucketName,
                                                  String keyName) {
     return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName +
