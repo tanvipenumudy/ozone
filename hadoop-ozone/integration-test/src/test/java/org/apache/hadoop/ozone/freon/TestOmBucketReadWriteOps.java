@@ -203,7 +203,6 @@ public class TestOmBucketReadWriteOps {
     private int readThreadPercentage = 90;
     private int numOfReadOperations = 50;
     private int numOfWriteOperations = 10;
-    private String factor = "THREE";
 
     private ParameterBuilder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -262,11 +261,6 @@ public class TestOmBucketReadWriteOps {
 
     private ParameterBuilder setNumOfWriteOperations(int numOfWriteOperations) {
       this.numOfWriteOperations = numOfWriteOperations;
-      return this;
-    }
-
-    private ParameterBuilder setFactor(String factor) {
-      this.factor = factor;
       return this;
     }
   }

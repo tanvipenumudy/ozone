@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -43,7 +44,7 @@ import java.util.concurrent.Future;
 @Command(name = "obrwo",
     aliases = "om-bucket-read-write-ops",
     description = "Generates files, performs respective read/write " +
-        "operations to measure lock performance, simulate lock contention.",
+        "operations to measure lock performance.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -54,11 +55,11 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(OmBucketReadWriteOps.class);
 
-  @Option(names = {"-P", "prefix-path", "--prefixPath"},
+  @Option(names = {"-P", "root-path", "--rootPath"},
       description = "Prefix path. Full name --prefixPath will be " +
           "removed in later versions.",
       defaultValue = "o3fs://bucket1.vol1/dir1/dir2")
-  private String prefixPath;
+  private String rootPath;
 
   @Option(names = {"-r", "--file-count-for-read", "--fileCountForRead"},
       description = "Number of files to be written in the read directory. " +
@@ -78,8 +79,6 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
           "in later versions.",
       defaultValue = "256")
   private long fileSizeInBytes;
-
-  // do we need a separate fileSizeInBytes for read and write?
 
   @Option(names = {"-b", "--buffer"},
       description = "Size of buffer used to generated the file content.",
@@ -101,8 +100,9 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   @Option(names = {"-T", "--read-thread-percentage", "--readThreadPercentage"},
       description = "Percentage of the total number of threads to be " +
-          "allocated for read operations. Full name --readThreadPercentage " +
-          "will be removed in later versions.",
+          "allocated for read operations. The remaining percentage will be " +
+          "used for the write operation threads. Full name " +
+          "--readThreadPercentage will be removed in later versions.",
       defaultValue = "90")
   private int readThreadPercentage;
 
@@ -121,38 +121,36 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
       defaultValue = "10")
   private int numOfWriteOperations;
 
-  @Option(names = {"-F", "--factor"},
-      description = "Replication factor (ONE, THREE)",
-      defaultValue = "THREE"
-  )
-  private HddsProtos.ReplicationFactor factor =
-      HddsProtos.ReplicationFactor.THREE;
-
   private Timer timer;
 
   private ContentGenerator contentGenerator;
 
   private FileSystem fileSystem;
 
-  // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436) in the end.
+  private int writeThreadCount;
+  private int readThreadCount;
 
   @Override
   public Void call() throws Exception {
     init();
 
-    LOG.info("prefixFilePath: " + prefixPath);
-    LOG.info("fileCountForRead: " + fileCountForRead);
-    LOG.info("fileCountForWrite: " + fileCountForWrite);
-    LOG.info("fileSizeInBytes: " + fileSizeInBytes);
-    LOG.info("bufferSize: " + bufferSize);
-    LOG.info("totalThreadCount: " + totalThreadCount);
-    LOG.info("readThreadPercentage: " + readThreadPercentage);
-    LOG.info("numOfReadOperations: " + numOfReadOperations);
-    LOG.info("numOfWriteOperations: " + numOfWriteOperations);
-    LOG.info("replicationFactor: " + factor);
+    readThreadCount = (readThreadPercentage * totalThreadCount) / 100;
+    writeThreadCount = totalThreadCount - readThreadCount;
+    print("rootPath: " + rootPath);
+    print("fileCountForRead: " + fileCountForRead);
+    print("fileCountForWrite: " + fileCountForWrite);
+    print("fileSizeInBytes: " + fileSizeInBytes);
+    print("bufferSize: " + bufferSize);
+    print("totalThreadCount: " + totalThreadCount);
+    print("readThreadPercentage: " + readThreadPercentage);
+    print("writeThreadPercentage: " + (100 - readThreadPercentage));
+    print("readThreadCount: " + readThreadCount);
+    print("writeThreadCount: " + writeThreadCount);
+    print("numOfReadOperations: " + numOfReadOperations);
+    print("numOfWriteOperations: " + numOfWriteOperations);
 
     OzoneConfiguration configuration = createOzoneConfiguration();
-    fileSystem = FileSystem.get(URI.create(prefixPath), configuration);
+    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
 
     contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
     timer = getMetrics().timer("file-create");
@@ -165,21 +163,21 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
     Future<Integer> readFuture = readOperations();
     Future<Integer> writeFuture = writeOperations();
     int rCount = readFuture.get();
-    System.out.println("Total Files Read = " + rCount);
+    print("Total Files Read = " + rCount);
     int wCount = writeFuture.get();
-    System.out.println("Total Files Written = " + wCount);
+    print("Total Files Written = " + wCount);
+
+    // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436) in the end.
   }
 
   private Future<Integer> readOperations() throws Exception {
 
-    // Step-1)
-    String readPath = prefixPath.concat("/").concat("readPath");
+    //
+    String readPath = rootPath.concat("/").concat("readPath");
     fileSystem.mkdirs(new Path(readPath));
     createFiles(readPath, fileCountForRead);
 
-    // Step-2)
-    int readThreadCount = (readThreadPercentage * totalThreadCount) / 100;
-
+    //
     ExecutorService readService = Executors.newFixedThreadPool(readThreadCount);
     Future<Integer> readFuture = readService.submit(() -> {
       int count = 0;
@@ -199,11 +197,10 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   private Future<Integer> writeOperations() throws Exception {
 
-    // Step-3)
-    int writeThreadCount =
-        totalThreadCount - (readThreadPercentage * totalThreadCount) / 100;
+    //
 
-    String writePath = prefixPath.concat("/").concat("writePath");
+    String writePath =
+        rootPath.concat(OzoneConsts.OM_KEY_PREFIX).concat("writePath");
     fileSystem.mkdirs(new Path(writePath));
 
     ExecutorService writeService =
