@@ -123,8 +123,8 @@ public class TestOmBucketReadWriteOps {
               .setNumOfReadOperations(100).setNumOfWriteOperations(0));
       verifyFileGeneration(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3").setNumOfReadOperations(0).setFileCountForWrite(20)
-              .setNumOfWriteOperations(100));
+              .setPrefixFilePath("/dir1/dir2/dir3").setNumOfReadOperations(0)
+              .setFileCountForWrite(20).setNumOfWriteOperations(100));
     } finally {
       shutdown();
     }
@@ -202,63 +202,66 @@ public class TestOmBucketReadWriteOps {
     private int numOfReadOperations = 50;
     private int numOfWriteOperations = 10;
 
-    private ParameterBuilder setVolumeName(String volumeName) {
-      this.volumeName = volumeName;
+    private ParameterBuilder setVolumeName(String volumeNameParam) {
+      volumeName = volumeNameParam;
       return this;
     }
 
-    private ParameterBuilder setBucketName(String bucketName) {
-      this.bucketName = bucketName;
+    private ParameterBuilder setBucketName(String bucketNameParam) {
+      bucketName = bucketNameParam;
       return this;
     }
 
-    private ParameterBuilder setPrefixFilePath(String prefixFilePath) {
-      this.prefixFilePath = prefixFilePath;
+    private ParameterBuilder setPrefixFilePath(String prefixFilePathParam) {
+      prefixFilePath = prefixFilePathParam;
       return this;
     }
 
-    private ParameterBuilder setFileCountForRead(int fileCountForRead) {
-      this.fileCountForRead = fileCountForRead;
+    private ParameterBuilder setFileCountForRead(int fileCountForReadParam) {
+      fileCountForRead = fileCountForReadParam;
       return this;
     }
 
-    private ParameterBuilder setFileCountForWrite(int fileCountForWrite) {
-      this.fileCountForWrite = fileCountForWrite;
+    private ParameterBuilder setFileCountForWrite(int fileCountForWriteParam) {
+      fileCountForWrite = fileCountForWriteParam;
       return this;
     }
 
-    private ParameterBuilder setFileSizeInBytes(long fileSizeInBytes) {
-      this.fileSizeInBytes = fileSizeInBytes;
+    private ParameterBuilder setFileSizeInBytes(long fileSizeInBytesParam) {
+      fileSizeInBytes = fileSizeInBytesParam;
       return this;
     }
 
-    private ParameterBuilder setBufferSize(int bufferSize) {
-      this.bufferSize = bufferSize;
+    private ParameterBuilder setBufferSize(int bufferSizeParam) {
+      bufferSize = bufferSizeParam;
       return this;
     }
 
-    private ParameterBuilder setLength(int length) {
-      this.length = length;
+    private ParameterBuilder setLength(int lengthParam) {
+      length = lengthParam;
       return this;
     }
 
-    private ParameterBuilder setTotalThreadCount(int totalThreadCount) {
-      this.totalThreadCount = totalThreadCount;
+    private ParameterBuilder setTotalThreadCount(int totalThreadCountParam) {
+      totalThreadCount = totalThreadCountParam;
       return this;
     }
 
-    private ParameterBuilder setReadThreadPercentage(int readThreadPercentage) {
-      this.readThreadPercentage = readThreadPercentage;
+    private ParameterBuilder setReadThreadPercentage(
+        int readThreadPercentageParam) {
+      readThreadPercentage = readThreadPercentageParam;
       return this;
     }
 
-    private ParameterBuilder setNumOfReadOperations(int numOfReadOperations) {
-      this.numOfReadOperations = numOfReadOperations;
+    private ParameterBuilder setNumOfReadOperations(
+        int numOfReadOperationsParam) {
+      numOfReadOperations = numOfReadOperationsParam;
       return this;
     }
 
-    private ParameterBuilder setNumOfWriteOperations(int numOfWriteOperations) {
-      this.numOfWriteOperations = numOfWriteOperations;
+    private ParameterBuilder setNumOfWriteOperations(
+        int numOfWriteOperationsParam) {
+      numOfWriteOperations = numOfWriteOperationsParam;
       return this;
     }
   }
