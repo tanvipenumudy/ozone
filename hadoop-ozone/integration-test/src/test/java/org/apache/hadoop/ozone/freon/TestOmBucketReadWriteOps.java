@@ -122,8 +122,7 @@ public class TestOmBucketReadWriteOps {
               .setNumOfReadOperations(100).setNumOfWriteOperations(0));
       verifyReadWriteOps(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
-              .setPrefixFilePath("/dir1/dir2/dir3").setFactor("ONE")
-              .setNumOfReadOperations(0).setFileCountForWrite(20)
+              .setPrefixFilePath("/dir1/dir2/dir3").setNumOfReadOperations(0).setFileCountForWrite(20)
               .setNumOfWriteOperations(100));
     } finally {
       shutdown();
@@ -150,7 +149,6 @@ public class TestOmBucketReadWriteOps {
             "-T", String.valueOf(parameterBuilder.readThreadPercentage),
             "-R", String.valueOf(parameterBuilder.numOfReadOperations),
             "-W", String.valueOf(parameterBuilder.numOfWriteOperations),
-            "-F", String.valueOf(parameterBuilder.factor),
             "-n", String.valueOf(1)});
 
     LOG.info("Started verifying read/write ops...");
