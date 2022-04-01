@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -95,7 +96,7 @@ public class TestOmBucketReadWriteOps {
   }
 
   @Test
-  public void testFileGeneration() throws Exception {
+  public void testOmBucketReadWriteOps() throws Exception {
     try {
       startCluster();
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
@@ -104,23 +105,23 @@ public class TestOmBucketReadWriteOps {
       out.getFD().sync();
       out.close();
 
-      verifyReadWriteOps(new ParameterBuilder());
-      verifyReadWriteOps(
+      verifyFileGeneration(new ParameterBuilder());
+      verifyFileGeneration(
           new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3"));
-      verifyReadWriteOps(
+      verifyFileGeneration(
           new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
               .setPrefixFilePath("/").setFileCountForRead(1000)
               .setFileCountForWrite(100).setTotalThreadCount(505));
-      verifyReadWriteOps(
+      verifyFileGeneration(
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/").setFileSizeInBytes(128)
               .setBufferSize(32));
-      verifyReadWriteOps(
+      verifyFileGeneration(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3").setFileCountForRead(250)
               .setNumOfReadOperations(100).setNumOfWriteOperations(0));
-      verifyReadWriteOps(
+      verifyFileGeneration(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
               .setPrefixFilePath("/dir1/dir2/dir3").setNumOfReadOperations(0).setFileCountForWrite(20)
               .setNumOfWriteOperations(100));
@@ -129,13 +130,12 @@ public class TestOmBucketReadWriteOps {
     }
   }
 
-  private void verifyReadWriteOps(ParameterBuilder parameterBuilder)
+  private void verifyFileGeneration(ParameterBuilder parameterBuilder)
       throws IOException {
     store.createVolume(parameterBuilder.volumeName);
     OzoneVolume volume = store.getVolume(parameterBuilder.volumeName);
     volume.createBucket(parameterBuilder.bucketName);
-    String rootPath =
-        "o3fs://" + parameterBuilder.bucketName + "." +
+    String rootPath = "o3fs://" + parameterBuilder.bucketName + "." +
             parameterBuilder.volumeName + parameterBuilder.prefixFilePath;
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
@@ -151,10 +151,10 @@ public class TestOmBucketReadWriteOps {
             "-W", String.valueOf(parameterBuilder.numOfWriteOperations),
             "-n", String.valueOf(1)});
 
-    LOG.info("Started verifying read/write ops...");
+    LOG.info("Started verifying OM bucket read/write ops file generation...");
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
         conf);
-    Path rootDir = new Path(rootPath.concat("/"));
+    Path rootDir = new Path(rootPath.concat(OzoneConsts.OM_KEY_PREFIX));
     FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
     verifyUtil(2, fileStatuses, true);
 

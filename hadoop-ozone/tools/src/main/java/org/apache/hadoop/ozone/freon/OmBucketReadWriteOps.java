@@ -43,7 +43,7 @@ import java.util.concurrent.Future;
  */
 @Command(name = "obrwo",
     aliases = "om-bucket-read-write-ops",
-    description = "Generates files, performs respective read/write " +
+    description = "Creates files, performs respective read/write " +
         "operations to measure lock performance.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
@@ -100,8 +100,8 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   @Option(names = {"-T", "--read-thread-percentage", "--readThreadPercentage"},
       description = "Percentage of the total number of threads to be " +
-          "allocated for read operations. The remaining percentage will be " +
-          "used for the write operation threads. Full name " +
+          "allocated for read operations. The remaining percentage of " +
+          "threads will be allocated for write operations. Full name " +
           "--readThreadPercentage will be removed in later versions.",
       defaultValue = "90")
   private int readThreadPercentage;
@@ -127,8 +127,8 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   private FileSystem fileSystem;
 
-  private int writeThreadCount;
   private int readThreadCount;
+  private int writeThreadCount;
 
   @Override
   public Void call() throws Exception {
@@ -136,6 +136,7 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
     readThreadCount = (readThreadPercentage * totalThreadCount) / 100;
     writeThreadCount = totalThreadCount - readThreadCount;
+
     print("rootPath: " + rootPath);
     print("fileCountForRead: " + fileCountForRead);
     print("fileCountForWrite: " + fileCountForWrite);
@@ -162,22 +163,28 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   private void mainMethod(long counter) throws Exception {
     Future<Integer> readFuture = readOperations();
     Future<Integer> writeFuture = writeOperations();
+
     int rCount = readFuture.get();
     print("Total Files Read = " + rCount);
+
     int wCount = writeFuture.get();
     print("Total Files Written = " + wCount);
 
-    // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436) in the end.
+    // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
 
   private Future<Integer> readOperations() throws Exception {
 
-    //
-    String readPath = rootPath.concat("/").concat("readPath");
+    // Create fileCountForRead (defaultValue = 1000) files under
+    // rootPath/readPath directory
+    String readPath =
+        rootPath.concat(OzoneConsts.OM_KEY_PREFIX).concat("readPath");
     fileSystem.mkdirs(new Path(readPath));
     createFiles(readPath, fileCountForRead);
 
-    //
+    // Start readThreadCount (defaultValue = 90) concurrent read threads
+    // performing numOfReadOperations (defaultValue = 50) iterations
+    // of read operations (fileSystem.listStatus(rootPath/readPath))
     ExecutorService readService = Executors.newFixedThreadPool(readThreadCount);
     Future<Integer> readFuture = readService.submit(() -> {
       int count = 0;
@@ -188,7 +195,7 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
           count = +status.length;
         }
       } catch (IOException e) {
-        LOG.warn("Exception while list status", e);
+        LOG.warn("Exception while listing status ", e);
       }
       return count;
     });
@@ -197,15 +204,15 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
 
   private Future<Integer> writeOperations() throws Exception {
 
-    //
-
+    // Start writeThreadCount (defaultValue = 10) concurrent write threads
+    // performing numOfWriteOperations (defaultValue = 10) iterations
+    // of write operations (createFiles(rootPath/writePath))
     String writePath =
         rootPath.concat(OzoneConsts.OM_KEY_PREFIX).concat("writePath");
     fileSystem.mkdirs(new Path(writePath));
 
     ExecutorService writeService =
         Executors.newFixedThreadPool(writeThreadCount);
-
     Future<Integer> writeFuture = writeService.submit(() -> {
       int count = 0;
       try {
@@ -214,7 +221,7 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
           count++;
         }
       } catch (IOException e) {
-        LOG.warn("Exception while creating file", e);
+        LOG.warn("Exception while creating file ", e);
       }
       return count;
     });
@@ -222,8 +229,8 @@ public class OmBucketReadWriteOps extends BaseFreonGenerator
   }
 
   private void createFile(String dir, long counter) throws Exception {
-    String fileName = dir.concat("/").concat(RandomStringUtils.
-        randomAlphanumeric(length));
+    String fileName = dir.concat(OzoneConsts.OM_KEY_PREFIX)
+        .concat(RandomStringUtils.randomAlphanumeric(length));
     Path file = new Path(fileName);
     if (LOG.isDebugEnabled()) {
       LOG.debug("FilePath:{}", file);
