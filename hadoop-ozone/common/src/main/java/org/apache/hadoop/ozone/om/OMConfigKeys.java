@@ -307,4 +307,8 @@ public final class OMConfigKeys {
   public static final long OZONE_OM_ADMIN_PROTOCOL_WAIT_BETWEEN_RETRIES_DEFAULT
       = 1000;
 
+  public static final String OZONE_OM_ENABLE_KEY_PATH_LOCK =
+      "ozone.om.enable.key.path.lock";
+  public static final boolean OZONE_OM_ENABLE_KEY_PATH_LOCK_DEFAULT =
+      false;
 }

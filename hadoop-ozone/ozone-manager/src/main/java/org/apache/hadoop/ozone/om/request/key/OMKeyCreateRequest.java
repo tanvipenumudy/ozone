@@ -215,9 +215,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      acquireLock = acquireWriteKeyPathLock(volumeName, bucketName, keyName,
+          omMetadataManager, ozoneManager.getEnableKeyPathLock(),
+          ozoneManager.getEnableFileSystemPaths());
+
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
       // true, we can avoid get from bucket table.
@@ -329,8 +330,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        try {
+          releaseWriteKeyPathLock(volumeName, bucketName, keyName,
+              omMetadataManager, ozoneManager.getEnableKeyPathLock(),
+              ozoneManager.getEnableFileSystemPaths());
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 
