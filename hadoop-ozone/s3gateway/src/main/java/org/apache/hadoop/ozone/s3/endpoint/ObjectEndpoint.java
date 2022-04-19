@@ -157,7 +157,7 @@ public class ObjectEndpoint extends EndpointBase {
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath,
       @HeaderParam("Content-Length") long length,
-      @QueryParam("partNumber")  int partNumber,
+      @QueryParam("partNumber") int partNumber,
       @QueryParam("uploadId") @DefaultValue("") String uploadID,
       InputStream body) throws IOException, OS3Exception {
 
@@ -229,6 +229,14 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       }
       LOG.error("Exception occurred in PutObject", ex);
+      throw ex;
+    } catch (OS3Exception ex) {
+      if (copyHeader != null) {
+        getMetrics().incCopyObjectFailure();
+      } else {
+        getMetrics().incCreateKeyFailure();
+      }
+      LOG.error("Exception occurred in PutObject", ex.getMessage());
       throw ex;
     } finally {
       if (output != null) {
@@ -466,7 +474,13 @@ public class ObjectEndpoint extends EndpointBase {
       } else {
         throw ex;
       }
-
+    } catch (OS3Exception ex) {
+      if (uploadId != null && !uploadId.equals("")) {
+        getMetrics().incAbortMultiPartUploadFailure();
+      } else {
+        getMetrics().incDeleteKeyFailure();
+      }
+      throw ex;
     }
     getMetrics().incDeleteKeySuccess();
     return Response
@@ -520,6 +534,9 @@ public class ObjectEndpoint extends EndpointBase {
       }
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
           "key: {}", bucket, key, ex);
+      throw ex;
+    } catch (OS3Exception ex) {
+      getMetrics().incInitMultiPartUploadFailure();
       throw ex;
     }
   }
@@ -696,7 +713,8 @@ public class ObjectEndpoint extends EndpointBase {
    * @throws OS3Exception
    */
   private Response listParts(String bucket, String key, String uploadID,
-      int partNumberMarker, int maxParts) throws IOException, OS3Exception {
+                             int partNumberMarker, int maxParts)
+      throws IOException, OS3Exception {
     ListPartsResponse listPartsResponse = new ListPartsResponse();
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
@@ -731,6 +749,7 @@ public class ObjectEndpoint extends EndpointBase {
       });
 
     } catch (OMException ex) {
+      getMetrics().incListPartsFailure();
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
@@ -901,7 +920,7 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     long currentDate = System.currentTimeMillis();
-    if  (ozoneDateInMs <= currentDate) {
+    if (ozoneDateInMs <= currentDate) {
       return OptionalLong.of(ozoneDateInMs);
     } else {
       // dates in the future are invalid, so return empty()
