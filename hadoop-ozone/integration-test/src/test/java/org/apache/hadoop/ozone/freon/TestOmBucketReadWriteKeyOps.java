@@ -35,6 +35,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -145,8 +146,20 @@ public class TestOmBucketReadWriteKeyOps {
     /*String rootPath = "o3fs://" + parameterBuilder.bucketName + "." +
         parameterBuilder.volumeName;*/
 //    String confPath = new File(path, "conf").getAbsolutePath();
-    new Freon().execute(
-        new String[]{/*"-conf", confPath,*/ "obrwk",
+    OmBucketReadWriteKeyOps omBucketReadWriteKeyOps =
+        new OmBucketReadWriteKeyOps();
+    CommandLine cmd1 = new CommandLine(omBucketReadWriteKeyOps);
+
+    OzoneClientKeyGenerator ozoneClientKeyGenerator =
+        new OzoneClientKeyGenerator();
+    CommandLine cmd = new CommandLine(ozoneClientKeyGenerator);
+
+    cmd.execute("-v", String.valueOf(parameterBuilder.volumeName),
+        "-b", String.valueOf(parameterBuilder.bucketName),
+        "-o", String.valueOf((Object) parameterBuilder.omServiceID),
+        "-n", String.valueOf(1));
+
+    /*cmd1.execute(*//*"-conf", confPath,*//*
             "-v", String.valueOf(parameterBuilder.volumeName),
             "-b", String.valueOf(parameterBuilder.bucketName),
             "-k", String.valueOf(parameterBuilder.keyCountForRead),
@@ -159,7 +172,7 @@ public class TestOmBucketReadWriteKeyOps {
             "-R", String.valueOf(parameterBuilder.numOfReadOperations),
             "-W", String.valueOf(parameterBuilder.numOfWriteOperations),
             "-o", String.valueOf((Object) parameterBuilder.omServiceID),
-            "-n", String.valueOf(1)});
+            "-n", String.valueOf(1));*/
 
     LOG.info("Started verifying OM bucket read/write ops file generation...");
     /*FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
@@ -180,10 +193,10 @@ public class TestOmBucketReadWriteKeyOps {
     Path writeDir = new Path(rootPath.concat("/writePath"));
     FileStatus[] writeFileStatuses = fileSystem.listStatus(writeDir);
     verifyFileCreation(writeThreadCount * parameterBuilder.fileCountForWrite *
-        parameterBuilder.numOfWriteOperations, writeFileStatuses, false);
+        parameterBuilder.numOfWriteOperations, writeFileStatuses, false);*/
 
     verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
-        .getOMLockMetrics());*/
+        .getOMLockMetrics());
   }
 
   private void verifyFileCreation(int expectedCount, FileStatus[] fileStatuses,

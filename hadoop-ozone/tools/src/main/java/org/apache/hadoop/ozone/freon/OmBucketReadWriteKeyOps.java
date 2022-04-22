@@ -194,8 +194,8 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
     int readResult = readOperations();
     int writeResult = writeOperations();
 
-    print("Total Files Read: " + readResult);
-    print("Total Files Written: " + writeResult * keyCountForWrite);
+    print("Total Keys Read: " + readResult);
+    print("Total Keys Written: " + writeResult * keyCountForWrite);
 
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
@@ -219,11 +219,11 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
         int readCount = 0;
         try {
           for (int j = 0; j < numOfReadOperations; j++) {
-            /*Iterator<? extends OzoneKey> ozoneKeyIterator =*/
+            Iterator<? extends OzoneKey> ozoneKeyIterator =
                 bucket.listKeys("/readPath/");
-            /*while (ozoneKeyIterator.hasNext()) {
+            while (ozoneKeyIterator.hasNext()) {
               readCount += 1;
-            }*/
+            }
           }
         } catch (IOException e) {
           LOG.warn("Exception while listing keys ", e);
