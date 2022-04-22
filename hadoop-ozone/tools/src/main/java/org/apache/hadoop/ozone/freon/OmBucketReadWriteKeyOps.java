@@ -76,7 +76,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
      defaultValue = "/dir1/dir2")
     private String rootPath;*/
 
-  @Option(names = {"-r", "--key-count-for-read"},
+  @Option(names = {"-k", "--key-count-for-read"},
       description = "Number of keys to be created for read operations.",
       defaultValue = "100")
   private int keyCountForRead;
@@ -91,7 +91,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
       defaultValue = "256")
   private long keySizeInBytes;
 
-  @Option(names = {"-b", "--buffer"},
+  @Option(names = {"-B", "--buffer"},
       description = "Size of buffer used to generated the key content.",
       defaultValue = "64")
   private int bufferSize;
@@ -219,11 +219,11 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
         int readCount = 0;
         try {
           for (int j = 0; j < numOfReadOperations; j++) {
-            Iterator<? extends OzoneKey> ozoneKeyIterator =
+            /*Iterator<? extends OzoneKey> ozoneKeyIterator =*/
                 bucket.listKeys("/readPath/");
-            while (ozoneKeyIterator.hasNext()) {
+            /*while (ozoneKeyIterator.hasNext()) {
               readCount += 1;
-            }
+            }*/
           }
         } catch (IOException e) {
           LOG.warn("Exception while listing keys ", e);
