@@ -124,7 +124,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
       defaultValue = "10")
   private int numOfWriteOperations;
 
-  @Option(names = {"o", "--om-service-id"},
+  @Option(names = {"-o", "--om-service-id"},
       description = "OM Service ID"
   )
   private String omServiceID;
