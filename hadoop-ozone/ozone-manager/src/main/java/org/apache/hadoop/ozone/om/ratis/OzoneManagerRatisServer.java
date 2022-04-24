@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 
@@ -35,11 +37,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -47,6 +49,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -111,6 +114,8 @@ public final class OzoneManagerRatisServer {
   private final OzoneManager ozoneManager;
   private final OzoneManagerStateMachine omStateMachine;
   private final String ratisStorageDir;
+  private final List<ThreadPoolExecutor> multipleExecutors;
+  private static OzoneConfiguration configuration;
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -147,7 +152,7 @@ public final class OzoneManagerRatisServer {
     this.raftPeerMap = Maps.newHashMap();
     peers.forEach(e -> raftPeerMap.put(e.getId().toString(), e));
     this.raftGroup = RaftGroup.valueOf(raftGroupId, peers);
-
+    this.multipleExecutors = createMultipleExecutors();
     if (isBootstrapping) {
       LOG.info("OM started in Bootstrap mode. Instantiating OM Ratis server " +
           "with groupID: {}", raftGroupIdStr);
@@ -534,7 +539,7 @@ public final class OzoneManagerRatisServer {
   private OzoneManagerStateMachine getStateMachine(ConfigurationSource conf)
       throws IOException {
     return new OzoneManagerStateMachine(this,
-        TracingUtil.isTracingEnabled(conf));
+        TracingUtil.isTracingEnabled(conf), multipleExecutors);
   }
 
   @VisibleForTesting
@@ -823,4 +828,23 @@ public final class OzoneManagerRatisServer {
     return null;
   }
 
+  private static List<ThreadPoolExecutor> createMultipleExecutors() {
+    // TODO create single pool with N threads if using non-incremental chunks
+    final int threadCount = configuration.getInt(
+        OzoneConfigKeys
+            .OM_NUM_WRITE_KEY_PATH_THREADS_KEY,
+        OzoneConfigKeys
+            .OM_NUM_WRITE_KEY_PATH_THREADS_DEFAULT);
+
+    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
+    for (int i = 0; i < executors.length; i++) {
+      ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
+          .setNameFormat("OM StateMachine ApplyTransaction Thread-" + i + "-%d")
+          .build();
+      BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
+      executors[i] = new ThreadPoolExecutor(1, 1,
+          0, TimeUnit.SECONDS, workQueue, threadFactory);
+    }
+    return ImmutableList.copyOf(executors);
+  }
 }
