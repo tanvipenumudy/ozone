@@ -74,7 +74,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
 /*  @Option(names = {"-P", "--prefix-path"},
      description = "Prefix path",
      defaultValue = "/dir1/dir2")
-    private String rootPath;*/
+    private String prefixPath;*/
 
   @Option(names = {"-k", "--key-count-for-read"},
       description = "Number of keys to be created for read operations.",
@@ -168,6 +168,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
     print("writeThreadCount: " + writeThreadCount);
     print("numOfReadOperations: " + numOfReadOperations);
     print("numOfWriteOperations: " + numOfWriteOperations);
+    print("omServiceID: " + omServiceID);
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
@@ -222,7 +223,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
             Iterator<? extends OzoneKey> ozoneKeyIterator =
                 bucket.listKeys("/readPath/");
             while (ozoneKeyIterator.hasNext()) {
-              readCount += 1;
+              ++readCount;
             }
           }
         } catch (IOException e) {
