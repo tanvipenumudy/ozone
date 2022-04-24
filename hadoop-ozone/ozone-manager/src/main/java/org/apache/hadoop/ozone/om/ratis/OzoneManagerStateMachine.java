@@ -25,15 +25,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -90,8 +88,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final RatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
+  private final List<ThreadPoolExecutor> multipleExecutors;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
+  private boolean isKeyPathLockEnabled;
+  private OzoneConfiguration configuration;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -105,7 +106,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
-      boolean isTracingEnabled) throws IOException {
+                                  boolean isTracingEnabled,
+                                  List<ThreadPoolExecutor> multipleExecutors)
+      throws IOException {
     this.omRatisServer = ratisServer;
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
@@ -114,14 +117,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     loadSnapshotInfoFromDB();
 
     this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-
+    this.isKeyPathLockEnabled = configuration.getBoolean(
+        OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED,
+        OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT);
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
-
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
     this.executorService = HadoopExecutors.newSingleThreadExecutor(build);
+    this.multipleExecutors = multipleExecutors;
     this.installSnapshotExecutor = HadoopExecutors.newSingleThreadExecutor();
   }
 
@@ -313,8 +318,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       //if there are too many pending requests, wait for doubleBuffer flushing
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
-      CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex), executorService);
+      CompletableFuture<OMResponse> future;
+      if (isKeyPathLockEnabled) {
+        // obtain the resourceName to pass to getExecutorService()
+        future = CompletableFuture.supplyAsync(
+            () -> runCommand(request, trxLogIndex), getExecutorService());
+      } else {
+        future = CompletableFuture.supplyAsync(
+            () -> runCommand(request, trxLogIndex), executorService);
+      }
       future.thenApply(omResponse -> {
         if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
@@ -346,6 +358,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     } catch (Exception e) {
       return completeExceptionally(e);
     }
+  }
+
+  private ExecutorService getExecutorService(String resourceName) {
+    // resourceName -> interface/abstract class hashCodeGenerator
+    int i = (int) (resourceName.hashCode() % multipleExecutors.size());
+    return multipleExecutors.get(i);
   }
 
   /**
