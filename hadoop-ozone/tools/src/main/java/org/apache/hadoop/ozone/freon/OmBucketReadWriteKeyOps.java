@@ -127,7 +127,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
   @Option(names = {"-o", "--om-service-id"},
       description = "OM Service ID"
   )
-  private String omServiceID;
+  private String omServiceID = null;
 
   @CommandLine.Mixin
   private FreonReplicationOptions replication;
