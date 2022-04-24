@@ -100,6 +100,93 @@ public final class OzoneManagerRatisUtils {
   private OzoneManagerRatisUtils() {
   }
 
+  public static class OmKeyPathArgsInfo {
+    String volName = "";
+    String buckName = "";
+    String keyName = "";
+
+    OmKeyPathArgsInfo(String volName, String buckName, String keyName){
+      this.volName = volName;
+      this.buckName = buckName;
+      this.keyName = keyName;
+    }
+
+    public String getBuckName() {
+      return buckName;
+    }
+
+    public String getVolName() {
+      return volName;
+    }
+
+    public String getKeyName() {
+      return keyName;
+    }
+  }
+
+  public static OmKeyPathArgsInfo getKeyPathInfo(OMRequest omRequest) {
+
+    OzoneManagerProtocolProtos.KeyArgs keyArgs;
+    //  We are considering only the request classes supported for OBJECT_STORE.
+
+    switch (omRequest.getCmdType()) {
+    case CreateDirectory:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      break;
+    case CreateFile:
+      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
+      break;
+    case CreateKey:
+      keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
+      break;
+    case AllocateBlock:
+      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
+      break;
+    case CommitKey:
+      keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
+      break;
+    case DeleteKey:
+      keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
+      break;
+    /*case DeleteKeys:
+      OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
+          omRequest.getDeleteKeysRequest().getDeleteKeys();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          deleteKeyArgs.getVolumeName(), deleteKeyArgs.getBucketName(),
+          deleteKeyArgs.getKeyName());
+      break;
+    case RenameKey:
+      keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
+      break;
+    case RenameKeys:
+      OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs =
+          omRequest.getRenameKeysRequest().getRenameKeysArgs();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          renameKeysArgs.getVolumeName(), renameKeysArgs.getBucketName(),
+          renameKeysArgs.getKeyName());
+      break;*/
+    case InitiateMultiPartUpload:
+      keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
+      break;
+    case CommitMultiPartUpload:
+      keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
+      break;
+    case AbortMultiPartUpload:
+      keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      break;
+    case CompleteMultiPartUpload:
+      keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
+      break;
+    default:
+      return null;
+    }
+    return new OmKeyPathArgsInfo(keyArgs.getVolumeName(),
+        keyArgs.getBucketName(), keyArgs.getKeyName());
+  }
+
   /**
    * Create OMClientRequest which encapsulates the OMRequest.
    * @param omRequest

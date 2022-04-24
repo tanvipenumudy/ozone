@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -71,6 +72,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PATH_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
@@ -211,9 +213,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
+      OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider()
+          .createLockStrategy(getBucketLayout());
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      acquiredLock =
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, KEY_PATH_LOCK,
+              volumeName, bucketName, keyName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -318,8 +323,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider()
+            .createLockStrategy(getBucketLayout());
+        try {
+          ozoneLockStrategy.releaseWriteLock(omMetadataManager, KEY_PATH_LOCK,
+                  volumeName, bucketName, keyName);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 

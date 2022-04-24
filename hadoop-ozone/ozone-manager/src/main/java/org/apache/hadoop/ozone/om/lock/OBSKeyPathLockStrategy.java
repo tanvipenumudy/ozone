@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.hashcodegenerator.DefaultOMHashCodeGeneratorImpl;
+import org.apache.hadoop.ozone.om.hashcodegenerator.OMHashCodeGenerator;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 
 import java.io.IOException;
@@ -30,6 +32,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * KEY_PATH_LOCK.
  */
 public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
+
+  private OMHashCodeGenerator omHashCodeGenerator =
+      new DefaultOMHashCodeGeneratorImpl();
 
   @Override
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
@@ -45,9 +50,17 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     Preconditions.checkArgument(acquiredLock,
         "BUCKET_LOCK should be acquired!");
 
-    acquiredLock = omMetadataManager.getLock()
-        .acquireWriteLock(resource, volumeName, bucketName, keyName);
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(resource, volumeName, bucketName, keyName);
+    // resourceName -> interface/abstract class hashCodeGenerator
 
+    // OMHashCodeGenerator -> interface
+    // DefaultOMHashCodeGeneratorImpl -> concrete class .hashCode()
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
+    acquiredLock = omMetadataManager.getLock()
+        .acquireWriteHashedLock(resource, String.valueOf(resourceHashCode));
+
+//    System.out.println("OBSKeyPathLockStrategy acquireWriteLock");
     return acquiredLock;
   }
 
@@ -56,12 +69,16 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
                                OzoneManagerLock.Resource resource,
                                String volumeName, String bucketName,
                                String keyName) throws IOException {
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(resource, volumeName, bucketName, keyName);
+    // resourceName -> interface/abstract class hashCodeGenerator
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock()
-        .releaseWriteLock(resource, volumeName, bucketName, keyName);
+        .releaseWriteHashedLock(resource, String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
-
+//    System.out.println("OBSKeyPathLockStrategy releaseWriteLock");
     return;
   }
 
@@ -79,8 +96,12 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     Preconditions.checkArgument(acquiredLock,
         "BUCKET_LOCK should be acquired!");
 
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(resource, volumeName, bucketName, keyName);
+    // resourceName -> interface/abstract class hashCodeGenerator
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     acquiredLock = omMetadataManager.getLock()
-        .acquireReadLock(resource, volumeName, bucketName, keyName);
+        .acquireReadHashedLock(resource, String.valueOf(resourceHashCode));
 
     return acquiredLock;
   }
@@ -90,8 +111,12 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
                               OzoneManagerLock.Resource resource,
                               String volumeName, String bucketName,
                               String keyName) throws IOException {
+    String resourceName = omMetadataManager.getLock()
+        .generateResourceName(resource, volumeName, bucketName, keyName);
+    // resourceName -> interface/abstract class hashCodeGenerator
+    int resourceHashCode = omHashCodeGenerator.getHashCode(resourceName);
     omMetadataManager.getLock()
-        .releaseReadLock(resource, volumeName, bucketName, keyName);
+        .releaseReadHashedLock(resource, String.valueOf(resourceHashCode));
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
