@@ -220,7 +220,7 @@ public final class OzoneConfigKeys {
   //change from RATIS to OM
   public static final String
       OM_NUM_WRITE_KEY_PATH_THREADS_KEY
-      = "ratis.num.write.key.path.threads";
+      = "om.num.write.key.path.threads";
   public static final int OM_NUM_WRITE_KEY_PATH_THREADS_DEFAULT = 10;
   public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
       = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;

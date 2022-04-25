@@ -829,7 +829,6 @@ public final class OzoneManagerRatisServer {
   }
 
   private static List<ThreadPoolExecutor> createMultipleExecutors() {
-    // TODO create single pool with N threads if using non-incremental chunks
     final int threadCount = configuration.getInt(
         OzoneConfigKeys
             .OM_NUM_WRITE_KEY_PATH_THREADS_KEY,
