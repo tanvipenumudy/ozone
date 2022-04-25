@@ -100,6 +100,76 @@ public final class OzoneManagerRatisUtils {
   private OzoneManagerRatisUtils() {
   }
 
+  public static String getKeyPathName(OMRequest omRequest) {
+    /*
+     * Key requests that can have multiple variants based on the bucket layout
+     * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
+     */
+    String keyName = "";
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = null;
+    switch (omRequest.getCmdType()) {
+    case CreateDirectory:
+      keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case CreateFile:
+      keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case CreateKey:
+      keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case AllocateBlock:
+      keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case CommitKey:
+      keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case DeleteKey:
+      keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case DeleteKeys:
+      OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
+          omRequest.getDeleteKeysRequest()
+              .getDeleteKeys();
+      // keyName = keyArgs.getKeyName();
+      break;
+    case RenameKey:
+      keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case RenameKeys:
+      OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs =
+          omRequest.getRenameKeysRequest().getRenameKeysArgs();
+      // keyName = renameKeysArgs.getNam
+      break;
+    case InitiateMultiPartUpload:
+      keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case CommitMultiPartUpload:
+      keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case AbortMultiPartUpload:
+      keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    case CompleteMultiPartUpload:
+      keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
+      keyName = keyArgs.getKeyName();
+      break;
+    default:
+      keyName = "";
+    }
+
+    return keyName;
+  }
+
   /**
    * Create OMClientRequest which encapsulates the OMRequest.
    * @param omRequest

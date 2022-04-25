@@ -434,6 +434,85 @@ public class TestOzoneManagerLock {
   }
 
   @Test
+  public void testLockHoldCount2() {
+    String[] resourceName, resourceName1;
+    String resourceLockName, resourceLockName1;
+
+    OzoneManagerLock.Resource resource =
+        OzoneManagerLock.Resource.KEY_PATH_LOCK,
+        resource1 = OzoneManagerLock.Resource.BUCKET_LOCK;
+    resourceName = generateResourceName(resource);
+    resourceName1 = generateResourceName(resource1);
+    resourceLockName = generateResourceLockName(resource, resourceName);
+    resourceLockName1 = generateResourceLockName(resource1, resourceName1);
+    int lockName = "/vol-1/buck-1/key-1".hashCode();
+    int lockName1 = "/vol-1/buck-1/key-1".hashCode();
+/*    int lockName2 = "/vol-1/buck-1/key-2".hashCode();
+    int lockName3 = "/vol-1/buck-1/key-3".hashCode();
+    int lockName4 = "/vol-1/buck-1/key-123".hashCode();
+    int lockName44 = "/vol-1/buck-1/key-124".hashCode();
+    int lockName5 = "/vol-1/buck-1/key-5679".hashCode();
+    int lockName6 = "/vol-1/buck-1/key-1236".hashCode();
+    int lockName7 = "/vol-1/buck-1/key-1237".hashCode();
+    int lockName8 = "/vol-1/buck-1/key-1".hashCode();*/
+
+    int resourceHashCode = resourceLockName.hashCode();
+    testLockHoldHashedCountUtil(resource, String.valueOf(resourceHashCode), resource1, resourceName1, resourceLockName1);
+  }
+
+  private void testLockHoldHashedCountUtil(OzoneManagerLock.Resource resource,
+                                           String resourceHashCode,
+                                           OzoneManagerLock.Resource resource1,
+                                           String[] resourceName1,
+                                           String resourceLockName1) {
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    /*lock.acquireReadLock(resource1, resourceName1);*/
+    /*System.out.println(lock.getCurrentLocks().size());*/
+    assertEquals(0, lock.getReadHoldCount(resourceHashCode));
+    lock.acquireReadHashedLock(resource, resourceHashCode);
+    assertEquals(1, lock.getReadHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    lock.acquireReadHashedLock(resource, resourceHashCode);
+    assertEquals(2, lock.getReadHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    lock.releaseReadHashedLock(resource, resourceHashCode);
+    assertEquals(1, lock.getReadHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    lock.releaseReadHashedLock(resource, resourceHashCode);
+    assertEquals(0, lock.getReadHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    /*lock.releaseReadLock(resource1, resourceName1);*/
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    Assert.assertFalse(lock.isWriteLockedByCurrentThread(resourceHashCode));
+    assertEquals(0, lock.getWriteHoldCount(resourceHashCode));
+    lock.acquireWriteHashedLock(resource, resourceHashCode);
+    Assert.assertTrue(lock.isWriteLockedByCurrentThread(resourceHashCode));
+    assertEquals(1, lock.getWriteHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    lock.acquireWriteHashedLock(resource, resourceHashCode);
+    Assert.assertTrue(lock.isWriteLockedByCurrentThread(resourceHashCode));
+    assertEquals(2, lock.getWriteHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    lock.releaseWriteHashedLock(resource, resourceHashCode);
+    Assert.assertTrue(lock.isWriteLockedByCurrentThread(resourceHashCode));
+    assertEquals(1, lock.getWriteHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+
+    lock.releaseWriteHashedLock(resource, resourceHashCode);
+    Assert.assertFalse(lock.isWriteLockedByCurrentThread(resourceHashCode));
+    assertEquals(0, lock.getWriteHoldCount(resourceHashCode));
+    /*System.out.println(lock.getCurrentLocks().size());*/
+  }
+
+  @Test
   public void testLockConcurrentStats() throws InterruptedException {
     String[] resourceName;
     for (OzoneManagerLock.Resource resource :

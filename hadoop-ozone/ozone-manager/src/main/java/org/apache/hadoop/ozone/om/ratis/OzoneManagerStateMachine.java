@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -322,7 +324,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       if (isKeyPathLockEnabled) {
         // obtain the resourceName to pass to getExecutorService()
         future = CompletableFuture.supplyAsync(
-            () -> runCommand(request, trxLogIndex), getExecutorService());
+            () -> runCommand(request, trxLogIndex), getExecutorService(request));
       } else {
         future = CompletableFuture.supplyAsync(
             () -> runCommand(request, trxLogIndex), executorService);
@@ -360,8 +362,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
   }
 
-  private ExecutorService getExecutorService(String resourceName) {
+  private ExecutorService getExecutorService(OMRequest request) {
     // resourceName -> interface/abstract class hashCodeGenerator
+    String resourceName = OzoneManagerRatisUtils.getKeyPathName(request);
+    if (StringUtils.isBlank(resourceName)) {
+      // add a debug log message
+      return executorService;
+    }
+
     int i = (int) (resourceName.hashCode() % multipleExecutors.size());
     return multipleExecutors.get(i);
   }
