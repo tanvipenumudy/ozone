@@ -115,7 +115,6 @@ public final class OzoneManagerRatisServer {
   private final OzoneManagerStateMachine omStateMachine;
   private final String ratisStorageDir;
   private final List<ThreadPoolExecutor> multipleExecutors;
-  private static OzoneConfiguration configuration;
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -828,8 +827,8 @@ public final class OzoneManagerRatisServer {
     return null;
   }
 
-  private static List<ThreadPoolExecutor> createMultipleExecutors() {
-    final int threadCount = configuration.getInt(
+  public List<ThreadPoolExecutor> createMultipleExecutors() {
+    final int threadCount = ozoneManager.getConfiguration().getInt(
         OzoneConfigKeys
             .OM_NUM_WRITE_KEY_PATH_THREADS_KEY,
         OzoneConfigKeys
