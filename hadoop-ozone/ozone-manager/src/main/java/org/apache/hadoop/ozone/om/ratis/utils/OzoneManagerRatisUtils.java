@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -105,69 +106,97 @@ public final class OzoneManagerRatisUtils {
      * Key requests that can have multiple variants based on the bucket layout
      * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
      */
-    String keyName = "";
-    OzoneManagerProtocolProtos.KeyArgs keyArgs = null;
+    String keyPathName = "";
+    OzoneManagerLock.Resource resource =
+        OzoneManagerLock.Resource.KEY_PATH_LOCK;
+    OzoneManagerProtocolProtos.KeyArgs keyArgs;
+
     switch (omRequest.getCmdType()) {
     case CreateDirectory:
       keyArgs = omRequest.getCreateDirectoryRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case CreateFile:
       keyArgs = omRequest.getCreateFileRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case CreateKey:
       keyArgs = omRequest.getCreateKeyRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case AllocateBlock:
       keyArgs = omRequest.getAllocateBlockRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case CommitKey:
       keyArgs = omRequest.getCommitKeyRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case DeleteKey:
       keyArgs = omRequest.getDeleteKeyRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
-    case DeleteKeys:
+    /*case DeleteKeys:
       OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
-          omRequest.getDeleteKeysRequest()
-              .getDeleteKeys();
-      // keyName = keyArgs.getKeyName();
+          omRequest.getDeleteKeysRequest().getDeleteKeys();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          deleteKeyArgs.getVolumeName(), deleteKeyArgs.getBucketName(),
+          deleteKeyArgs.getKeyName());
       break;
     case RenameKey:
       keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case RenameKeys:
       OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs =
           omRequest.getRenameKeysRequest().getRenameKeysArgs();
-      // keyName = renameKeysArgs.getNam
-      break;
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          renameKeysArgs.getVolumeName(), renameKeysArgs.getBucketName(),
+          renameKeysArgs.getKeyName());
+      break;*/
     case InitiateMultiPartUpload:
       keyArgs = omRequest.getInitiateMultiPartUploadRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case CommitMultiPartUpload:
       keyArgs = omRequest.getCommitMultiPartUploadRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case AbortMultiPartUpload:
       keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     case CompleteMultiPartUpload:
       keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
-      keyName = keyArgs.getKeyName();
+      keyPathName = OzoneManagerLock.generateResourceName(resource,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+          keyArgs.getKeyName());
       break;
     default:
-      keyName = "";
+      keyPathName = "";
     }
 
-    return keyName;
+    return keyPathName;
   }
 
   /**

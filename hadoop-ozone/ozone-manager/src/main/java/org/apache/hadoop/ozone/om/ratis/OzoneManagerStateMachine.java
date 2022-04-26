@@ -322,7 +322,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       CompletableFuture<OMResponse> future;
       if (isKeyPathLockEnabled) {
-        // obtain the resourceName to pass to getExecutorService()
         future = CompletableFuture.supplyAsync(
             () -> runCommand(request, trxLogIndex), getExecutorService(request));
       } else {
@@ -366,11 +365,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // resourceName -> interface/abstract class hashCodeGenerator
     String resourceName = OzoneManagerRatisUtils.getKeyPathName(request);
     if (StringUtils.isBlank(resourceName)) {
-      // add a debug log message
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "keyPathName is blank or OMRequest is not a key specific request.");
+      }
       return executorService;
     }
 
-    int i = (int) (resourceName.hashCode() % multipleExecutors.size());
+    int i = resourceName.hashCode() % multipleExecutors.size();
     return multipleExecutors.get(i);
   }
 
