@@ -110,6 +110,7 @@ public final class OzoneManagerRatisUtils {
     OzoneManagerLock.Resource resource =
         OzoneManagerLock.Resource.KEY_PATH_LOCK;
     OzoneManagerProtocolProtos.KeyArgs keyArgs;
+    //  We are considering only the request classes supported for OBJECT_STORE.
 
     switch (omRequest.getCmdType()) {
     case CreateDirectory:
