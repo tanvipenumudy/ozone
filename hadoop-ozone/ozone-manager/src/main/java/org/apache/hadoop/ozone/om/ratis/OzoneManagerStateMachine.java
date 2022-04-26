@@ -27,8 +27,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
@@ -38,7 +36,6 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.lock.OBSKeyPathLockStrategy;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -97,8 +94,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
   private boolean isKeyPathLockEnabled;
   private boolean isFileSystemPathsEnabled;
-  private OzoneConfiguration configuration;
-  private BucketLayout bucketLayout;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.

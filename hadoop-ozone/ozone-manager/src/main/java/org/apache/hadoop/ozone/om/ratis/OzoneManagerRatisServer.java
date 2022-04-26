@@ -41,7 +41,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
