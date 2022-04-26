@@ -29,15 +29,14 @@ import java.util.concurrent.*;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -94,7 +93,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private boolean isKeyPathLockEnabled;
+  private boolean isFileSystemPathsEnabled;
   private OzoneConfiguration configuration;
+  private BucketLayout bucketLayout;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -122,6 +123,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.isKeyPathLockEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED,
         OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT);
+    this.isFileSystemPathsEnabled =
+        configuration.getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
 
@@ -321,7 +325,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       CompletableFuture<OMResponse> future;
-      if (isKeyPathLockEnabled) {
+      if (isKeyPathLockEnabled &&
+          ((bucketLayout == BucketLayout.OBJECT_STORE) ||
+              (!isFileSystemPathsEnabled &&
+                  bucketLayout == BucketLayout.LEGACY))) {
         future = CompletableFuture.supplyAsync(
             () -> runCommand(request, trxLogIndex), getExecutorService(request));
       } else {
