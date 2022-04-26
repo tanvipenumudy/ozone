@@ -217,7 +217,6 @@ public final class OzoneConfigKeys {
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = ScmConfigKeys.
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
-  //change from RATIS to OM
   public static final String
       OM_NUM_WRITE_KEY_PATH_THREADS_KEY
       = "om.num.write.key.path.threads";
