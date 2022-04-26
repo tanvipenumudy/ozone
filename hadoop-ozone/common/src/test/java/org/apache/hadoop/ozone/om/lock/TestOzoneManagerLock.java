@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -510,6 +511,103 @@ public class TestOzoneManagerLock {
     Assert.assertFalse(lock.isWriteLockedByCurrentThread(resourceHashCode));
     assertEquals(0, lock.getWriteHoldCount(resourceHashCode));
     /*System.out.println(lock.getCurrentLocks().size());*/
+  }
+
+  // test-case-1 - write hashed lock on "/vol-1/buck-1/a/b/c/d/key-0"
+  // (by multiple threads)
+  @Test
+  public void testHashedKeyPathLockCase1() throws InterruptedException {
+
+    final int threadCount = 10;
+    OzoneManagerLock.Resource resource =
+        OzoneManagerLock.Resource.KEY_PATH_LOCK;
+
+    String keyPathName = "/vol-1/buck-1/a/b/c/d/key-0";
+    String resourceHashCode = String.valueOf(keyPathName.hashCode());
+
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    Thread[] threads = new Thread[threadCount];
+    long startTime = Time.monotonicNow();
+
+    for (int i = 0; i < threads.length; i++) {
+
+      threads[i] = new Thread(() -> {
+        lock.acquireWriteHashedLock(resource, resourceHashCode);
+        LOG.info("Hashed Key Path Write Lock Acquired by " +
+            Thread.currentThread().getName());
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        lock.releaseWriteHashedLock(resource, resourceHashCode);
+        LOG.info("Hashed Key Path Write Lock Released by " +
+            Thread.currentThread().getName());
+      });
+      threads[i].start();
+    }
+
+    for (Thread t : threads) {
+      t.join();
+    }
+
+    long endTime = Time.monotonicNow() - startTime;
+    System.out.println("testHashedKeyPathLockCase1() Time Elapsed: " + endTime);
+    return;
+  }
+
+//  test-case-2 - write hashed lock on "/vol-1/buck-1/a/b/c/d/key-0" (thread-0)
+//              - write hashed lock on "/vol-1/buck-1/a/b/c/d/key-1" (thread-1)
+//              .
+//              .
+//              .
+//              - write hashed lock on "/vol-1/buck-1/a/b/c/d/key-9" (thread-9)
+  @Test
+  public void testHashedKeyPathLockCase2() throws InterruptedException {
+
+    final int threadCount = 10;
+    OzoneManagerLock.Resource resource =
+        OzoneManagerLock.Resource.KEY_PATH_LOCK;
+
+    String volumeName = "vol-1";
+    String bucketName = "buck-1";
+
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+
+    Thread[] threads = new Thread[threadCount];
+    long startTime = Time.monotonicNow();
+
+    for (int i = 0; i < threads.length; i++) {
+
+      int finalI = i;
+      threads[i] = new Thread(() -> {
+        String sampleResourceName = generateResourceLockName(resource,
+            new String[]{volumeName, bucketName, "a/b/c/d/key-" + finalI});
+        lock.acquireWriteHashedLock(resource,
+            String.valueOf(sampleResourceName.hashCode()));
+        LOG.info("Hashed Key Path Write Lock Acquired by " +
+            Thread.currentThread().getName());
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        lock.releaseWriteHashedLock(resource,
+            String.valueOf(sampleResourceName.hashCode()));
+        LOG.info("Hashed Key Path Write Lock Released by " +
+            Thread.currentThread().getName());
+      });
+      threads[i].start();
+    }
+
+    for (Thread t : threads) {
+      t.join();
+    }
+
+    long endTime = Time.monotonicNow() - startTime;
+    System.out.println("testHashedKeyPathLockCase2() Time Elapsed: " + endTime);
+    return;
   }
 
   @Test
