@@ -601,6 +601,10 @@ public class OzoneManagerLock {
     omLockMetrics.unRegister();
   }
 
+  public OMLockMetrics getOMLockMetrics() {
+    return omLockMetrics;
+  }
+
   /**
    * Resource defined in Ozone.
    */
