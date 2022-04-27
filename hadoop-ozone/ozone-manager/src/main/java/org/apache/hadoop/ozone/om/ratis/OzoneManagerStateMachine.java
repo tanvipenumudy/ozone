@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ha.hashcodegenerator.DefaultOMHashCodeGeneratorImpl;
+import org.apache.hadoop.ozone.om.ha.hashcodegenerator.OMHashCodeGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
@@ -94,6 +96,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
   private boolean isKeyPathLockEnabled;
   private boolean isFileSystemPathsEnabled;
+  private OMHashCodeGenerator omHashCodeGenerator;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -127,6 +130,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                 OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
+    this.omHashCodeGenerator = new DefaultOMHashCodeGeneratorImpl();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("OM StateMachine ApplyTransaction Thread - %d").build();
@@ -392,14 +396,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
         // TODO: LOG debug
         int size = multipleExecutors.size();
-        int i = (((resourceName.hashCode() % size) + size) % size);
+        int i =
+            (((omHashCodeGenerator.getHashCode(resourceName) % size) + size) %
+                size);
         return multipleExecutors.get(i);
       } else if (!isFileSystemPathsEnabled &&
           bucketLayout == BucketLayout.LEGACY) {
         // old pre-created bucket with enableFileSystemPaths = false.
         // TODO: LOG debug
         int size = multipleExecutors.size();
-        int i = (((resourceName.hashCode() % size) + size) % size);
+        int i =
+            (((omHashCodeGenerator.getHashCode(resourceName) % size) + size) %
+                size);
         return multipleExecutors.get(i);
       }
     }
