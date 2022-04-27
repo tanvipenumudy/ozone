@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -126,13 +125,7 @@ public final class OzoneManagerRatisUtils {
   }
 
   public static OmKeyPathArgsInfo getKeyPathInfo(OMRequest omRequest) {
-    /*
-     * Key requests that can have multiple variants based on the bucket layout
-     * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
-     */
 
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK;
     OzoneManagerProtocolProtos.KeyArgs keyArgs;
     //  We are considering only the request classes supported for OBJECT_STORE.
 
@@ -188,10 +181,10 @@ public final class OzoneManagerRatisUtils {
       keyArgs = omRequest.getCompleteMultiPartUploadRequest().getKeyArgs();
       break;
     default:
-      return new OmKeyPathArgsInfo("", "", "");
+      return null;
     }
-    return new OmKeyPathArgsInfo(keyArgs.getVolumeName(), keyArgs.getBucketName(),
-        keyArgs.getKeyName());
+    return new OmKeyPathArgsInfo(keyArgs.getVolumeName(),
+        keyArgs.getBucketName(), keyArgs.getKeyName());
   }
 
   /**

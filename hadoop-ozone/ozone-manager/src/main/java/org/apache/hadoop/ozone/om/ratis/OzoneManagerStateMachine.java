@@ -401,7 +401,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     }
 
-    // key_path_lock optimization disabled, will return regular executor service
+    // key_path_lock optimization disabled, will return regular executor
+    // service.
     return executorService;
   }
 
