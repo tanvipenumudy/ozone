@@ -48,6 +48,9 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     String resourceName = omMetadataManager.getLock()
         .generateResourceName(resource, volumeName, bucketName, keyName);
     // resourceName -> interface/abstract class hashCodeGenerator
+
+    // OMHashCodeGenerator -> interface
+    // DefaultOMHashCodeGeneratorImpl -> concrete class .hashCode()
     int resourceHashCode = resourceName.hashCode();
     acquiredLock = omMetadataManager.getLock()
         .acquireWriteHashedLock(resource, String.valueOf(resourceHashCode));

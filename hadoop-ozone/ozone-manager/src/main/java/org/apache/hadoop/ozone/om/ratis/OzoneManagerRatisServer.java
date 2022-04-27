@@ -829,9 +829,9 @@ public final class OzoneManagerRatisServer {
   public List<ThreadPoolExecutor> createMultipleExecutors() {
     final int threadCount = ozoneManager.getConfiguration().getInt(
         OzoneConfigKeys
-            .OM_NUM_WRITE_KEY_PATH_THREADS_KEY,
+            .OM_NUM_CONCURRENT_WRITE_THREADS_KEY,
         OzoneConfigKeys
-            .OM_NUM_WRITE_KEY_PATH_THREADS_DEFAULT);
+            .OM_NUM_CONCURRENT_WRITE_THREADS_DEFAULT);
 
     ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
     for (int i = 0; i < executors.length; i++) {
