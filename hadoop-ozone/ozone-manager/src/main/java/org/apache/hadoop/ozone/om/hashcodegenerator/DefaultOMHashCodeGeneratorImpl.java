@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.ha.hashcodegenerator;
+package org.apache.hadoop.ozone.om.hashcodegenerator;
 
 public class DefaultOMHashCodeGeneratorImpl implements OMHashCodeGenerator{
 
