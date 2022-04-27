@@ -1070,4 +1070,24 @@ public class TestOzoneManagerLock {
       Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
     }
   }
+
+  @Test
+  public void testHashCode() {
+    OzoneManagerLock.Resource resource =
+        OzoneManagerLock.Resource.KEY_PATH_LOCK;
+    int threadCount = 10;
+    int executorArray[] = new int[threadCount];
+
+    for(int i = 0; i < 1_000_000; i++) {
+      String resourceLockName =
+          generateResourceLockName(resource, generateResourceName(resource));
+      int index = (((resourceLockName.hashCode() % threadCount) + threadCount) %
+          threadCount);
+      executorArray[index]++;
+    }
+
+    for(int i = 0; i < threadCount; i++) {
+      System.out.println("index: " + i + " -> " + executorArray[i]);
+    }
+  }
 }
