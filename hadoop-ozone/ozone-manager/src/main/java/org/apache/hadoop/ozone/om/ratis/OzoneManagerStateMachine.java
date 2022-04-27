@@ -389,13 +389,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               omKeyPathArgsInfo.getVolName(),
               omKeyPathArgsInfo.getBuckName());
 
+      int size = multipleExecutors.size();
+      int i = (((resourceName.hashCode() % size) + size) % size);
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
-        int i = resourceName.hashCode() % multipleExecutors.size();
         // TODO: LOG debug
         return multipleExecutors.get(i);
       } else if (!isFileSystemPathsEnabled &&
           bucketLayout == BucketLayout.LEGACY) {
-        int i = resourceName.hashCode() % multipleExecutors.size();
         // TODO: LOG debug
         return multipleExecutors.get(i);
       }
