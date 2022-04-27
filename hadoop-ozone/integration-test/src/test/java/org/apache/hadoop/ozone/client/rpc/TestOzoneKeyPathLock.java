@@ -31,7 +31,7 @@ import java.util.Arrays;
 import java.util.Collection;
 
 @RunWith(Parameterized.class)
-public class TestOzoneLockPath extends TestOzoneRpcClientAbstract {
+public class TestOzoneKeyPathLock extends TestOzoneRpcClientAbstract {
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -60,8 +60,8 @@ public class TestOzoneLockPath extends TestOzoneRpcClientAbstract {
   private static boolean keyPathLockEnabled;
   private static boolean enableFileSystemPaths;
 
-  public TestOzoneLockPath(boolean setKeyPathLock,
-                           boolean setFileSystemPaths){
+  public TestOzoneKeyPathLock(boolean setKeyPathLock,
+                              boolean setFileSystemPaths){
     keyPathLockEnabled = setKeyPathLock;
     enableFileSystemPaths = setFileSystemPaths;
   }
