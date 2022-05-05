@@ -60,6 +60,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     acquiredLock = omMetadataManager.getLock()
         .acquireWriteHashedLock(resource, String.valueOf(resourceHashCode));
 
+//    System.out.println("OBSKeyPathLockStrategy acquireWriteLock");
     return acquiredLock;
   }
 
@@ -77,7 +78,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
 
     omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
-
+//    System.out.println("OBSKeyPathLockStrategy releaseWriteLock");
     return;
   }
 

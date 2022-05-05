@@ -836,7 +836,8 @@ public final class OzoneManagerRatisServer {
     ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)
-          .setNameFormat("OM StateMachine ApplyTransaction Thread-" + i + "-%d")
+          .setNameFormat(
+              "OM StateMachine ApplyTransaction Concurrent Thread-" + i + "-%d")
           .build();
       BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,

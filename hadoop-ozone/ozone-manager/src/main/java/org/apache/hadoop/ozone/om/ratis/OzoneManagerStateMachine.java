@@ -370,7 +370,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                                              boolean isFileSystemPathsEnabled)
       throws IOException {
 
-    if (isKeyPathLockEnabled) {
+    if (true) {
       OzoneManagerRatisUtils.OmKeyPathArgsInfo omKeyPathArgsInfo =
           OzoneManagerRatisUtils.getKeyPathInfo(request);
       if (omKeyPathArgsInfo == null) {
