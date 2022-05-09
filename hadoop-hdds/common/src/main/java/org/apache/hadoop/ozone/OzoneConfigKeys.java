@@ -220,7 +220,7 @@ public final class OzoneConfigKeys {
   public static final String
       OM_NUM_CONCURRENT_WRITE_THREADS_KEY
       = "om.num.concurrent.write.threads";
-  public static final int OM_NUM_CONCURRENT_WRITE_THREADS_DEFAULT = 10;
+  public static final int OM_NUM_CONCURRENT_WRITE_THREADS_DEFAULT = 1;
   public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
       = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
   public static final ReplicationLevel

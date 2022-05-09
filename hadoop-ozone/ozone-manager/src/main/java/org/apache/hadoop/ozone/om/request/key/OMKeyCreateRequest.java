@@ -228,6 +228,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           ozoneLockStrategy.acquireWriteLock(omMetadataManager, KEY_PATH_LOCK,
               volumeName, bucketName, keyName);
       Thread.sleep(5000);
+      /*acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+          volumeName, bucketName);*/
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -348,6 +350,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
+        /*omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName);*/
         OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider()
             .createLockStrategy(getBucketLayout());
         try {

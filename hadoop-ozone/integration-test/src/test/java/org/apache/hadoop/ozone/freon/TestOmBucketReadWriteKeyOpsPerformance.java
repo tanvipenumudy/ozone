@@ -43,14 +43,14 @@ import java.io.IOException;
 /**
  * Test for OmBucketReadWriteKeyOps.
  */
-public class TestOmBucketReadWriteKeyOpsDraft {
+public class TestOmBucketReadWriteKeyOpsPerformance {
 
   private String path;
   private OzoneConfiguration conf = null;
   private MiniOzoneCluster cluster = null;
   private ObjectStore store = null;
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestOmBucketReadWriteKeyOpsDraft.class);
+      LoggerFactory.getLogger(TestOmBucketReadWriteKeyOpsPerformance.class);
 
   @Before
   public void setup() {
@@ -82,6 +82,9 @@ public class TestOmBucketReadWriteKeyOpsDraft {
     conf = getOzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
+    conf.setBoolean(OMConfigKeys.OZONE_OM_KEY_PATH_LOCK_ENABLED, false);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, false);
+    conf.setInt(OzoneConfigKeys.OM_NUM_CONCURRENT_WRITE_THREADS_KEY, 100);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
@@ -103,7 +106,24 @@ public class TestOmBucketReadWriteKeyOpsDraft {
       out.getFD().sync();
       out.close();
 
-      verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
+      /*verifyFreonCommand(new ParameterBuilder());*/
+//      verifyFreonCommand(
+//          new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
+//              .setTotalThreadCount(10).setNumOfReadOperations(1)
+//              .setNumOfWriteOperations(1).setKeyCountForRead(1)
+//              .setKeyCountForWrite(1));
+
+      LOG.info("Details: ");
+
+      verifyFreonCommand(
+          new ParameterBuilder().setTotalThreadCount(
+                  10)
+              .setNumOfReadOperations(0).setNumOfWriteOperations(1)
+              .setKeyCountForRead(1).setKeyCountForWrite(1)
+              .setKeySizeInBytes(0)
+              .setReadThreadPercentage(10));
+
+      /*verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
           .setNumOfReadOperations(10).setNumOfWriteOperations(5)
           .setKeyCountForRead(10).setKeyCountForWrite(5));
       verifyFreonCommand(
@@ -126,8 +146,8 @@ public class TestOmBucketReadWriteKeyOpsDraft {
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
               .setTotalThreadCount(20).setNumOfReadOperations(0)
-              .setNumOfWriteOperations(5).setKeyCountForRead(0).
-              setKeyCountForWrite(5));
+              .setNumOfWriteOperations(5).setKeyCountForRead(0)
+              .setKeyCountForWrite(5));*/
     } finally {
       shutdown();
     }
