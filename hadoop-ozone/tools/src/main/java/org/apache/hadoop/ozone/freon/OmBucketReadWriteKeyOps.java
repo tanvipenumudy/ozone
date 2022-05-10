@@ -34,7 +34,6 @@ import picocli.CommandLine.Option;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -53,8 +52,7 @@ import java.util.concurrent.ExecutorCompletionService;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 
-public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
-    implements Callable<Void> {
+public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmBucketReadWriteKeyOps.class);
@@ -193,7 +191,8 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
 
-  private int readOperations() throws Exception {
+  @Override
+  public int readOperations() throws Exception {
 
     // Create keyCountForRead (defaultValue = 1000) keys under
     // rootPath/readPath
@@ -240,8 +239,8 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
 
     return readResult;
   }
-
-  private int writeOperations() throws Exception {
+  @Override
+  public int writeOperations() throws Exception {
 
     // Start writeThreadCount (defaultValue = 10) concurrent write threads
     // performing numOfWriteOperations (defaultValue = 10) iterations
@@ -283,7 +282,8 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
     return writeResult;
   }
 
-  private void createKey(String path) throws Exception {
+  @Override
+  public void create(String path) throws Exception {
     String keyName = path.concat(OzoneConsts.OM_KEY_PREFIX)
         .concat(RandomStringUtils.randomAlphanumeric(length));
 
@@ -299,7 +299,7 @@ public class OmBucketReadWriteKeyOps extends BaseFreonGenerator
 
   private void createKeys(String path, int keyCount) throws Exception {
     for (int i = 0; i < keyCount; i++) {
-      createKey(path);
+      create(path);
     }
   }
 }
