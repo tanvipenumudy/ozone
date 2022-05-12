@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -72,6 +73,7 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.KEY_PATH_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
@@ -219,8 +221,23 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
-      acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider()
+          .createLockStrategy(getBucketLayout());
+      // acquire lock
+      acquireLock =
+          ozoneLockStrategy.acquireWriteLock(omMetadataManager, KEY_PATH_LOCK,
+              volumeName, bucketName, keyName);
+
+      int sleepTime = ozoneManager.getConfiguration()
+          .getInt(OMConfigKeys.OZONE_OM_INDUCED_LOCK_DELAY,
+              OMConfigKeys.OZONE_OM_INDUCED_LOCK_DELAY_DEFAULT);
+
+      if (sleepTime > 0) {
+        LOG.info("***Induced Sleeping time ms : " + sleepTime);
+        Thread.sleep(sleepTime);
+      }
+      /*acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+          volumeName, bucketName);*/
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -335,12 +352,22 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquireLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        /*omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName);*/
+        OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider()
+            .createLockStrategy(getBucketLayout());
+        try {
+          ozoneLockStrategy.releaseWriteLock(omMetadataManager, KEY_PATH_LOCK,
+              volumeName, bucketName, keyName);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     }
 

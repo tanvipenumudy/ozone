@@ -45,6 +45,7 @@ import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -59,6 +60,7 @@ public class TestOzoneManagerStateMachine {
 
   private OzoneManagerStateMachine ozoneManagerStateMachine;
   private OzoneManagerPrepareState prepareState;
+  private List<ThreadPoolExecutor> multipleExecutors;
 
   @Before
   public void setup() throws Exception {
@@ -85,8 +87,10 @@ public class TestOzoneManagerStateMachine {
     when(ozoneManager.getSnapshotInfo()).thenReturn(
         Mockito.mock(RatisSnapshotInfo.class));
     when(ozoneManager.getConfiguration()).thenReturn(conf);
+    multipleExecutors = ozoneManagerRatisServer.createMultipleExecutors();
     ozoneManagerStateMachine =
-        new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
+        new OzoneManagerStateMachine(ozoneManagerRatisServer, false,
+            multipleExecutors);
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
   }
 
