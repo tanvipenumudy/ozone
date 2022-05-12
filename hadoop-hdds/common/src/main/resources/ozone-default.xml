@@ -2875,6 +2875,14 @@
   </property>
 
   <property>
+    <name>ozone.om.induced.lock.delay</name>
+    <tag>OZONE, OM</tag>
+    <value>0</value>
+    <description>Induced synthetic lock delay in OMKeyCreateRequest.class.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.client.key.provider.cache.expiry</name>
     <tag>OZONE, CLIENT, SECURITY</tag>
     <value>10d</value>
