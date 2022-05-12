@@ -147,7 +147,7 @@ public class OmBucketReadWriteFileOps extends BaseFreonGenerator
     fileSystem = FileSystem.get(URI.create(rootPath), configuration);
 
     contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
-    timer = getMetrics().timer("file-create");
+    timer = getMetrics().timer("file- create");
 
     runTests(this::mainMethod);
     return null;
