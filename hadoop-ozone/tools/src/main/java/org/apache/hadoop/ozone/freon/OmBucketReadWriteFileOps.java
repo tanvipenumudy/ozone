@@ -81,6 +81,8 @@ public class OmBucketReadWriteFileOps extends AbstractOmBucketReadWriteOps {
     print("Total Files Read: " + readResult);
     print("Total Files Written: " + writeResult * fileCountForWrite);
 
+    printOMLockMetrics();
+
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
 

@@ -163,11 +163,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       }));
     }
 
-    print("ReadLockWaitingTimeMsStat -> " +
-        mbs.getAttribute(bean, "ReadLockWaitingTimeMsStat").toString());
-    print("ReadLockHeldTimeMsStat -> " +
-        mbs.getAttribute(bean, "ReadLockHeldTimeMsStat").toString());
-
     int readResult = 0;
     for (int i = 0; i < readFutures.size(); i++) {
       readResult += readExecutorCompletionService.take().get();
@@ -208,11 +203,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
       }));
     }
 
-    print("WriteLockWaitingTimeMsStat -> " +
-        mbs.getAttribute(bean, "WriteLockWaitingTimeMsStat").toString());
-    print("WriteLockHeldTimeMsStat -> " +
-        mbs.getAttribute(bean, "WriteLockHeldTimeMsStat").toString());
-
     int writeResult = 0;
     for (int i = 0; i < writeFutures.size(); i++) {
       writeResult += writeExecutorCompletionService.take().get();
@@ -244,5 +234,16 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
 
   protected long getSizeInBytes() {
     return sizeInBytes;
+  }
+
+  protected void printOMLockMetrics() throws Exception {
+    print("ReadLockWaitingTimeMsStat -> " +
+        mbs.getAttribute(bean, "ReadLockWaitingTimeMsStat").toString());
+    print("ReadLockHeldTimeMsStat -> " +
+        mbs.getAttribute(bean, "ReadLockHeldTimeMsStat").toString());
+    print("WriteLockWaitingTimeMsStat -> " +
+        mbs.getAttribute(bean, "WriteLockWaitingTimeMsStat").toString());
+    print("WriteLockHeldTimeMsStat -> " +
+        mbs.getAttribute(bean, "WriteLockHeldTimeMsStat").toString());
   }
 }

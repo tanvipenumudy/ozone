@@ -116,6 +116,8 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
     print("Total Keys Read: " + readResult);
     print("Total Keys Written: " + writeResult * keyCountForWrite);
 
+    printOMLockMetrics();
+
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
 
