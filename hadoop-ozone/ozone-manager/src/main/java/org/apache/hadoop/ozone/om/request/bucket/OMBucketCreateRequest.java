@@ -152,6 +152,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OmBucketInfo omBucketInfo = null;
+    // test
     if (bucketInfo.getBucketLayout() == null || bucketInfo.getBucketLayout()
         .equals(BucketLayoutProto.LEGACY)) {
       // Bucket Layout argument was not passed during bucket creation.
