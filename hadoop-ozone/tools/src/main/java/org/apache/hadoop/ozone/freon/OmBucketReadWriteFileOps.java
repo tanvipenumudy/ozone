@@ -40,6 +40,7 @@ import java.net.URI;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 
+@SuppressWarnings("java:S2245") // no need for secure random
 public class OmBucketReadWriteFileOps extends AbstractOmBucketReadWriteOps {
 
   @Option(names = {"-P", "--root-path"},
@@ -80,8 +81,6 @@ public class OmBucketReadWriteFileOps extends AbstractOmBucketReadWriteOps {
 
     print("Total Files Read: " + readResult);
     print("Total Files Written: " + writeResult * fileCountForWrite);
-
-    printOMLockMetrics();
 
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }

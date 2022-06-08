@@ -145,6 +145,20 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.container.db.dir</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>Determines where the per-disk rocksdb instances will be
+      stored. This setting is optional. If unspecified, then rocksdb instances
+      are stored on the same disk as HDDS data.
+      The directories should be tagged with corresponding storage types
+      ([SSD]/[DISK]/[ARCHIVE]/[RAM_DISK]) for storage policies. The default
+      storage type will be DISK if the directory does not have a storage type
+      tagged explicitly. Ideally, this should be mapped to a fast disk
+      like an SSD.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.dir.du.reserved</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -1386,6 +1400,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.expired.container.replica.op.scrub.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>
+      SCM schedules a fixed interval job using the configured interval to
+      scrub expired container replica operation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.expired.container.replica.op.time.out</name>
+    <value>30m</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>
+      Timeout for the container replica operations(ADD/DELETE).After this
+      timeout the command will be retied
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.pipeline.creation.auto.factor.one</name>
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
@@ -2107,7 +2139,7 @@
   </property>
   <property>
     <name>ozone.scm.ratis.enable</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>Property to enable or disable Ratis server on SCM.
       Please note - this is a temporary property to disable SCM Ratis server.
@@ -2921,6 +2953,27 @@
   </property>
 
   <property>
+    <name>ozone.network.flexible.fqdn.resolution.enabled</name>
+    <tag>OZONE, SCM, OM</tag>
+    <value>false</value>
+    <description>SCM, OM hosts will be able to resolve itself based on its host
+      name instead of fqdn. It is useful for deploying to kubernetes
+      environment, during the initial launching time when
+      [pod_name].[service_name] is not resolvable yet because of the probe.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.network.jvm.address.cache.enabled</name>
+    <tag>OZONE, SCM, OM, DATANODE</tag>
+    <value>true</value>
+    <description>Disable the jvm network address cache. In environment such as
+      kubernetes, IPs of instances of scm, om and datanodes can be changed.
+      Disabling this cache helps to quickly resolve the fqdn's to the new IPs.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
@@ -3103,7 +3156,6 @@
     <description>The S3Gateway service principal.
       Ex: s3g/_HOST@REALM.COM</description>
   </property>
-
   <property>
     <name>hdds.container.checksum.verification.enabled</name>
     <value>true</value>
@@ -3121,7 +3173,14 @@
       OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
     </description>
   </property>
-
+  <property>
+    <name>ozone.om.grpc.maximum.response.length</name>
+    <value>134217728</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      OM/S3GATEWAY OMRequest, OMResponse over grpc max message length (bytes).
+    </description>
+  </property>
   <property>
     <name>ozone.default.bucket.layout</name>
     <value/>
@@ -3176,6 +3235,37 @@
     <description>
       A comma separated list of Datanode commands that are written to the DN audit logs only if the audit
       log level is debug. Ex: "CREATE_CONTAINER,READ_CONTAINER,UPDATE_CONTAINER".
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.multitenancy.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>Enable S3 Multi-Tenancy. If disabled, all S3 multi-tenancy requests are rejected.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.multitenancy.ranger.sync.interval</name>
+    <value>10m</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Determines how often the Multi-Tenancy Ranger background sync thread
+      service should run. Background thread periodically checks
+      Ranger policies and roles created by Multi-Tenancy feature.
+      And overwrites them if obvious discrepancies are detected.
+      Value should be set with a unit suffix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.multitenancy.ranger.sync.timeout</name>
+    <value>10s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The timeout for each Multi-Tenancy Ranger background sync thread run.
+      If the timeout has been reached, a warning message will be logged.
     </description>
   </property>
 </configuration>

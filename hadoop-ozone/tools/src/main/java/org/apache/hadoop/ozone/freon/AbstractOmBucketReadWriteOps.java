@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,10 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Option;
 
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,8 +90,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
   private ContentGenerator contentGenerator;
   private int readThreadCount;
   private int writeThreadCount;
-  private MBeanServer mbs;
-  private ObjectName bean;
 
   protected abstract void display();
 
@@ -121,11 +117,6 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
     ozoneConfiguration = createOzoneConfiguration();
     contentGenerator = new ContentGenerator(sizeInBytes, bufferSize);
     timer = getMetrics().timer("om-bucket-read-write-ops");
-
-    mbs = ManagementFactory.getPlatformMBeanServer();
-    bean = new ObjectName(
-        "Hadoop:service=OzoneManager," + "name=OzoneManagerInfo," +
-            "component=ServerRuntime");
 
     initialize(ozoneConfiguration);
 
@@ -234,16 +225,5 @@ public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
 
   protected long getSizeInBytes() {
     return sizeInBytes;
-  }
-
-  protected void printOMLockMetrics() throws Exception {
-    print("ReadLockWaitingTimeMsStat -> " +
-        mbs.getAttribute(bean, "ReadLockWaitingTimeMsStat").toString());
-    print("ReadLockHeldTimeMsStat -> " +
-        mbs.getAttribute(bean, "ReadLockHeldTimeMsStat").toString());
-    print("WriteLockWaitingTimeMsStat -> " +
-        mbs.getAttribute(bean, "WriteLockWaitingTimeMsStat").toString());
-    print("WriteLockHeldTimeMsStat -> " +
-        mbs.getAttribute(bean, "WriteLockHeldTimeMsStat").toString());
   }
 }

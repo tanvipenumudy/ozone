@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -103,6 +104,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private boolean isKeyPathLockEnabled;
   private boolean isFileSystemPathsEnabled;
   private OMHashCodeGenerator omHashCodeGenerator;
+  private final AtomicInteger statePausedCount = new AtomicInteger(0);
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are received through applyTransaction.
@@ -159,12 +161,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void reinitialize() throws IOException {
-    getLifeCycle().startAndTransition(() -> {
-      loadSnapshotInfoFromDB();
-      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-    });
+  public synchronized void reinitialize() throws IOException {
+    loadSnapshotInfoFromDB();
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      unpause(getLastAppliedTermIndex().getIndex(),
+          getLastAppliedTermIndex().getTerm());
+    }
   }
 
   @Override
@@ -451,7 +453,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void pause() {
+  public synchronized void pause() {
+    LOG.info("OzoneManagerStateMachine is pausing");
+    statePausedCount.incrementAndGet();
+    if (getLifeCycleState() == LifeCycle.State.PAUSED) {
+      return;
+    }
     getLifeCycle().transition(LifeCycle.State.PAUSING);
     getLifeCycle().transition(LifeCycle.State.PAUSED);
     ozoneManagerDoubleBuffer.stop();
@@ -462,14 +469,17 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * lastAppliedIndex. This should be done after uploading new state to the
    * StateMachine.
    */
-  public void unpause(long newLastAppliedSnaphsotIndex,
+  public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    getLifeCycle().startAndTransition(() -> {
-      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
-      this.setLastAppliedTermIndex(TermIndex.valueOf(
-          newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-    });
+    LOG.info("OzoneManagerStateMachine is un-pausing");
+    if (statePausedCount.decrementAndGet() == 0) {
+      getLifeCycle().startAndTransition(() -> {
+        this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+        handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
+        this.setLastAppliedTermIndex(TermIndex.valueOf(
+            newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
+      });
+    }
   }
 
   public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {

@@ -44,6 +44,7 @@ import java.util.Iterator;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 
+@SuppressWarnings("java:S2245") // no need for secure random
 public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
 
   @Option(names = {"-v", "--volume"},
@@ -115,8 +116,6 @@ public class OmBucketReadWriteKeyOps extends AbstractOmBucketReadWriteOps {
 
     print("Total Keys Read: " + readResult);
     print("Total Keys Written: " + writeResult * keyCountForWrite);
-
-    printOMLockMetrics();
 
     // TODO: print read/write lock metrics (HDDS-6435, HDDS-6436).
   }
