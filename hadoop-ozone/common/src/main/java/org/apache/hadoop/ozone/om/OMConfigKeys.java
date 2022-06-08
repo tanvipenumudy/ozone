@@ -349,6 +349,10 @@ public final class OMConfigKeys {
       "ozone.om.key.path.lock.enabled";
   public static final boolean OZONE_OM_KEY_PATH_LOCK_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_OM_INDUCED_LOCK_DELAY =
+      "ozone.om.induced.lock.delay";
+  public static final int OZONE_OM_INDUCED_LOCK_DELAY_DEFAULT = 0;
+
   public static final String OZONE_OM_MULTITENANCY_ENABLED =
       "ozone.om.multitenancy.enabled";
   public static final boolean OZONE_OM_MULTITENANCY_ENABLED_DEFAULT = false;
