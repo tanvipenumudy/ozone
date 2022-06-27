@@ -109,8 +109,8 @@ public class TestOmBucketReadWriteKeyOps {
 
       verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
           .setNumOfReadOperations(10).setNumOfWriteOperations(5)
-          .setKeyCountForRead(10).setKeyCountForWrite(5));
-      verifyFreonCommand(
+          .setKeyCountForRead(10).setKeyCountForWrite(1));
+      /*verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
               .setTotalThreadCount(10).setNumOfReadOperations(10)
               .setNumOfWriteOperations(5).setKeyCountForRead(10)
@@ -134,7 +134,7 @@ public class TestOmBucketReadWriteKeyOps {
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
               .setTotalThreadCount(20).setNumOfReadOperations(0)
               .setNumOfWriteOperations(5).setKeyCountForRead(0)
-              .setKeyCountForWrite(5));
+              .setKeyCountForWrite(5));*/
 
     } finally {
       shutdown();
