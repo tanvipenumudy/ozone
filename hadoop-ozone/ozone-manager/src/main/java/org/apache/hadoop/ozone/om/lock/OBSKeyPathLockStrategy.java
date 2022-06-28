@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.lock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.hashcodegenerator.OMHashCodeGeneratorFactory;
 import org.apache.hadoop.ozone.om.hashcodegenerator.StringOMHashCodeGeneratorImpl;
 import org.apache.hadoop.ozone.om.hashcodegenerator.OMHashCodeGenerator;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -36,7 +37,8 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
   // TODO: need to make this pluggable and allow users to configure the
   //  preferred hash code generation mechanism.
   private OMHashCodeGenerator omHashCodeGenerator =
-      new StringOMHashCodeGeneratorImpl();
+      OMHashCodeGeneratorFactory.getOMHashCodeGenerator(
+          StringOMHashCodeGeneratorImpl.class);
 
   @Override
   public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
