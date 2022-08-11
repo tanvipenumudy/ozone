@@ -222,6 +222,16 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       acquireLock = ozoneLockStrategy.acquireWriteLock(omMetadataManager,
           volumeName, bucketName, keyName);
+
+      int sleepTime = ozoneManager.getConfiguration()
+          .getInt(OMConfigKeys.OZONE_OM_INDUCED_LOCK_DELAY,
+              OMConfigKeys.OZONE_OM_INDUCED_LOCK_DELAY_DEFAULT);
+
+      if (sleepTime > 0) {
+        LOG.info("***Induced Sleeping time ms : " + sleepTime);
+        Thread.sleep(sleepTime);
+      }
+
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
@@ -337,6 +347,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
