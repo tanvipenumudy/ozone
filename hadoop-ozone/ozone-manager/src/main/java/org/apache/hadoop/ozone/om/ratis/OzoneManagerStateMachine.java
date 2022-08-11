@@ -386,6 +386,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                                              boolean enableKeyPathLockFlag,
                                              boolean enableFileSystemPathsFlag)
       throws IOException {
+    LOG.info("getExecutorService");
     if (enableKeyPathLockFlag) {
       OzoneManagerRatisUtils.OmKeyPathArgsInfo omKeyPathArgsInfo =
           OzoneManagerRatisUtils.getKeyPathInfo(request);
