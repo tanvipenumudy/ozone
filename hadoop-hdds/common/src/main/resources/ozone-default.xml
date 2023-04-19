@@ -2458,6 +2458,24 @@
     </description>
   </property>
   <property>
+    <name>hdds.security.client.scm.secretkey.om.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access
+      client scm secret key protocol for om.
+    </description>
+  </property>
+  <property>
+    <name>hdds.security.client.scm.secretkey.datanode.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access
+      client scm secret key protocol for datanodes.
+    </description>
+  </property>
+  <property>
     <name>hdds.security.ssl.keystore.reload.interval</name>
     <value>60s</value>
     <tag>SECURITY</tag>
