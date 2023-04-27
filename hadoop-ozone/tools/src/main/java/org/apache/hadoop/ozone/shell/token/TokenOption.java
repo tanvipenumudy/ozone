@@ -76,8 +76,4 @@ public class TokenOption {
       }
     }
   }
-
-  public String getTokenFilePath() {
-    return tokenFile.getAbsolutePath();
-  }
 }
