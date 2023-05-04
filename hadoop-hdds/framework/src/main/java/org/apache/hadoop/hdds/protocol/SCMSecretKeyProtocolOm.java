@@ -24,9 +24,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 /**
  * The client protocol to access secret key from OM.
  */
-@ProtocolInfo(protocolName =
-    "org.apache.hadoop.hdds.protocol.SCMSecretKeyProtocolOm",
-    protocolVersion = 1)
 @KerberosInfo(
     serverPrincipal = HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
     // TODO: move OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY to hdds-common.
