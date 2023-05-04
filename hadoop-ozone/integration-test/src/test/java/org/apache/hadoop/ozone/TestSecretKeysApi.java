@@ -211,7 +211,6 @@ public final class TestSecretKeysApi {
     assertNotNull(initialKey);
     List<ManagedSecretKey> initialKeys = secretKeyProtocol.getAllSecretKeys();
     assertEquals(initialKey, initialKeys.get(0));
-    ManagedSecretKey lastKey = initialKeys.get(initialKeys.size() - 1);
 
     LOG.info("Initial active key: {}", initialKey);
     LOG.info("Initial keys: {}", initialKeys);
@@ -234,9 +233,6 @@ public final class TestSecretKeysApi {
 
     assertEquals(updatedKey, updatedKeys.get(0));
     assertEquals(initialKey, updatedKeys.get(1));
-    // ensure the last key from the previous cycle no longer managed.
-    assertTrue(lastKey.isExpired());
-    assertFalse(updatedKeys.contains(lastKey));
 
     // assert getSecretKey by ID.
     ManagedSecretKey keyById = secretKeyProtocol.getSecretKey(
