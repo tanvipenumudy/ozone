@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The interface to call into underlying container layer.
@@ -361,6 +362,8 @@ public interface ScmClient extends Closeable {
    * returns the list of ratis peer roles. Currently only include peer address.
    */
   List<String> getScmRatisRoles() throws IOException;
+
+  boolean checkAndRotate() throws TimeoutException;
 
   /**
    * Transfer the raft leadership.
