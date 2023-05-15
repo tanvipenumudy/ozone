@@ -512,8 +512,13 @@ public final class HddsServerUtil {
   public static SecretKeyProtocol getScmSecretClient(
       ConfigurationSource conf) {
     SecretKeyProtocolFailoverProxyProvider proxyProvider =
-        new SecretKeyProtocolFailoverProxyProvider(conf,
-            null, SecretKeyProtocolScmPB.class);
+        null;
+    try {
+      proxyProvider = new SecretKeyProtocolFailoverProxyProvider(conf,
+          UserGroupInformation.getCurrentUser(), SecretKeyProtocolScmPB.class);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
     SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
         new SecretKeyProtocolClientSideTranslatorPB(proxyProvider,
             SecretKeyProtocolScmPB.class);
