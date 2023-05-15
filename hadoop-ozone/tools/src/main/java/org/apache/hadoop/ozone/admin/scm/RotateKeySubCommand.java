@@ -1,7 +1,6 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
