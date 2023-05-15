@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
@@ -53,10 +54,7 @@ import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
-import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
-import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
-import org.apache.hadoop.hdds.scm.proxy.SingleSecretKeyProtocolProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.*;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -509,6 +507,18 @@ public final class HddsServerUtil {
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
     return TracingUtil.createProxy(scmSecurityClient,
         SCMSecurityProtocol.class, conf);
+  }
+
+  public static SecretKeyProtocol getScmSecretClient(
+      ConfigurationSource conf) {
+    SecretKeyProtocolFailoverProxyProvider proxyProvider =
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            null, SecretKeyProtocolScmPB.class);
+    SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
+        new SecretKeyProtocolClientSideTranslatorPB(proxyProvider,
+            SecretKeyProtocolScmPB.class);
+    return TracingUtil.createProxy(scmSecretClient, SecretKeyProtocol.class,
+        conf);
   }
 
   /**

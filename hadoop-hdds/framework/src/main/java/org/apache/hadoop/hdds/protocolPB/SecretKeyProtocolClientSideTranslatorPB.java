@@ -42,6 +42,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -127,6 +128,18 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
         submitRequest(Type.GetCurrentSecretKey, builder -> {
         }).getCurrentSecretKeyResponseProto().getSecretKey();
     return ManagedSecretKey.fromProtobuf(secretKeyProto);
+  }
+
+  @Override
+  public boolean checkAndRotate() throws TimeoutException {
+    boolean checkAndRotateStatus = false;
+    try {
+      checkAndRotateStatus = submitRequest(Type.GetCheckAndRotate, builder -> {
+      }).getCheckAndRotateResponseProto().getStatus();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return checkAndRotateStatus;
   }
 
   @Override

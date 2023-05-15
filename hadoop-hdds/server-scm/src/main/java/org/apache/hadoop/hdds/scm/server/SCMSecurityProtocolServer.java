@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -230,6 +231,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           "Secret key initialization is not finished yet.",
           SECRET_KEY_NOT_INITIALIZED);
     }
+  }
+
+  @Override
+  public boolean checkAndRotate() throws TimeoutException {
+    return secretKeyManager.checkAndRotate();
   }
 
   /**

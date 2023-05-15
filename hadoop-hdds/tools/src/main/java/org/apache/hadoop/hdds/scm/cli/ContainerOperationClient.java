@@ -23,12 +23,15 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -43,9 +46,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,11 +60,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -73,6 +80,7 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+  private final SecretKeyProtocol secretKeyClient;
   private final boolean containerTokenEnabled;
   private final OzoneConfiguration configuration;
   private XceiverClientManager xceiverClientManager;
@@ -88,6 +96,7 @@ public class ContainerOperationClient implements ScmClient {
   public ContainerOperationClient(OzoneConfiguration conf) {
     this.configuration = conf;
     storageContainerLocationClient = newContainerRpcClient(conf);
+    secretKeyClient = newSecretKeyClient(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
@@ -122,6 +131,11 @@ public class ContainerOperationClient implements ScmClient {
   public static StorageContainerLocationProtocol newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
+  }
+
+  public static SecretKeyProtocol newSecretKeyClient(
+      ConfigurationSource configSource) {
+    return HddsServerUtil.getScmSecretClient(configSource);
   }
 
   @Override
@@ -464,6 +478,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
+
+  @Override
+  public boolean checkAndRotate() throws TimeoutException {
+    return secretKeyClient.checkAndRotate();
   }
 
   @Override

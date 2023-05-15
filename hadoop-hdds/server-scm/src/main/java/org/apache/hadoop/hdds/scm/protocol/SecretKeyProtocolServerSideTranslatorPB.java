@@ -20,6 +20,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyResponse;
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -102,6 +104,15 @@ public class SecretKeyProtocolServerSideTranslatorPB
             .setSecretKeysListResponseProto(getAllSecretKeys())
             .build();
 
+      case GetCheckAndRotate:
+        try {
+          return scmSecurityResponse
+              .setCheckAndRotateResponseProto(checkAndRotate())
+              .build();
+        } catch (TimeoutException e) {
+          e.printStackTrace();
+        }
+
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -151,6 +162,12 @@ public class SecretKeyProtocolServerSideTranslatorPB
     return SCMGetCurrentSecretKeyResponse.newBuilder()
         .setSecretKey(impl.getCurrentSecretKey().toProtobuf())
         .build();
+  }
+
+  private SCMGetCheckAndRotateResponse checkAndRotate() throws
+      TimeoutException {
+    return SCMGetCheckAndRotateResponse.newBuilder()
+        .setStatus(impl.checkAndRotate()).build();
   }
 
   private Status exceptionToResponseStatus(IOException ex) {
