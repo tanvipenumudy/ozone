@@ -277,7 +277,7 @@ public final class TestBlockTokens {
   }
 
   @Test
-  public void testGetCurrentSecretKey() {
+  public void testCheckAndRotateKeyDraft() {
 //    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION,
 //        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT);
     InetSocketAddress address =
