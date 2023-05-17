@@ -29,6 +29,6 @@ public class RotateKeySubCommand extends ScmSubcommand {
     } catch (TimeoutException e) {
       e.printStackTrace();
     }
-    System.out.println(status);
+    System.out.println("Rotate Status: " + status);
   }
 }

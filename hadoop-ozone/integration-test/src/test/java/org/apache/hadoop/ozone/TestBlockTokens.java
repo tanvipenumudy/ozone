@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -59,6 +60,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -74,6 +76,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
@@ -112,6 +115,7 @@ public final class TestBlockTokens {
   public Timeout timeout = Timeout.seconds(180);
 
   private static MiniKdc miniKdc;
+  private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
   private static File workDir;
   private static File ozoneKeytab;
@@ -128,6 +132,7 @@ public final class TestBlockTokens {
 
   @BeforeClass
   public static void init() throws Exception {
+    ozoneAdmin = new OzoneAdmin();
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
@@ -271,6 +276,16 @@ public final class TestBlockTokens {
     assertExceptionContains("Invalid token for user", ex);
   }
 
+  @Test
+  public void testGetCurrentSecretKey() {
+//    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION,
+//        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT);
+    InetSocketAddress address =
+        cluster.getStorageContainerManager().getClientRpcAddress();
+    String hostPort = address.getHostName() + ":" + address.getPort();
+    String[] args = {"scm", "rotate", "--scm", hostPort};
+    ozoneAdmin.execute(args);
+  }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
