@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ProtobufUtils;
 
@@ -149,6 +150,19 @@ public final class ManagedSecretKey {
     Instant expiryTime = Instant.ofEpochMilli(message.getExpiryTime());
     SecretKey secretKey = new SecretKeySpec(message.getEncoded().toByteArray(),
         message.getAlgorithm());
+    return new ManagedSecretKey(id, creationTime, expiryTime, secretKey);
+  }
+
+  public static ManagedSecretKey fromProtobuf(
+      OzoneManagerProtocolProtos.SCMGetCurrentSecretKeyResponse response) {
+    UUID id = ProtobufUtils.fromProtobuf(response.getSecretKey().getId());
+    Instant creationTime =
+        Instant.ofEpochMilli(response.getSecretKey().getCreationTime());
+    Instant expiryTime =
+        Instant.ofEpochMilli(response.getSecretKey().getExpiryTime());
+    SecretKey secretKey =
+        new SecretKeySpec(response.getSecretKey().getEncoded().toByteArray(),
+            response.getSecretKey().getAlgorithm());
     return new ManagedSecretKey(id, creationTime, expiryTime, secretKey);
   }
 }

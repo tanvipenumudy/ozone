@@ -91,6 +91,12 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
   @Test
+  public void testGetCurrentSecretKey() {
+    String[] args = {"om", "fetch", "-id", getOmServiceId()};
+    getOzoneAdmin().execute(args);
+  }
+
+  @Test
   public void testMultipartUpload() throws Exception {
 
     // Happy scenario when all OM's are up.

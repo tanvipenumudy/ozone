@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,8 +60,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.*;
 import static org.junit.Assert.fail;
 
 /**
@@ -69,6 +69,7 @@ import static org.junit.Assert.fail;
 @Timeout(300)
 public abstract class TestOzoneManagerHA {
 
+  private static OzoneAdmin ozoneAdmin;
   private static MiniOzoneHAClusterImpl cluster = null;
   private static MiniOzoneCluster.Builder clusterBuilder = null;
   private static ObjectStore objectStore;
@@ -101,6 +102,10 @@ public abstract class TestOzoneManagerHA {
 
   public OzoneConfiguration getConf() {
     return conf;
+  }
+
+  public OzoneAdmin getOzoneAdmin() {
+    return ozoneAdmin;
   }
 
   public MiniOzoneCluster.Builder getClusterBuilder() {
@@ -140,6 +145,7 @@ public abstract class TestOzoneManagerHA {
    */
   @BeforeAll
   public static void init() throws Exception {
+    ozoneAdmin = new OzoneAdmin();
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -158,6 +164,7 @@ public abstract class TestOzoneManagerHA {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
+    conf.set(OZONE_OM_SERVICE_IDS_KEY, "om-service-test1");
 
     // Some subclasses check RocksDB directly as part of their tests. These
     // depend on OBS layout.

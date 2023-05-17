@@ -24,3 +24,7 @@ Test Timeout        5 minutes
 Check om admin command
     ${result} =        Execute and checkrc              ozone admin om roles -id=omServiceIdDefault  0
                        Should Contain                   ${result}  This command works only on OzoneManager HA cluster.
+
+Fetch Keys
+    ${result} =        Execute                          ozone admin om fetch-key -id=omservice
+                       Should Contain                   ${result}  Done!

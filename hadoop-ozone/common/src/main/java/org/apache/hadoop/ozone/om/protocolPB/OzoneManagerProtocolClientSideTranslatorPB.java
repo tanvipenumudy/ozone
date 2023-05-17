@@ -31,7 +31,9 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -1353,6 +1355,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final GetS3VolumeContextResponse resp =
         handleError(omResponse).getGetS3VolumeContextResponse();
     return S3VolumeContext.fromProtobuf(resp);
+  }
+
+  @Override
+  public ManagedSecretKey getCurrentSecretKey() {
+
+    final OzoneManagerProtocolProtos.GetCurrentSecretKeyRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.GetCurrentSecretKeyRequest.newBuilder();
+
+    final OMRequest omRequest =
+        createOMRequest(Type.GetCurrentSecretKey).setGetCurrentSecretKeyRequest(
+            requestBuilder).build();
+
+    OMResponse omResponse = null;
+    try {
+      omResponse = submitRequest(omRequest);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    OzoneManagerProtocolProtos.SCMGetCurrentSecretKeyResponse resp = null;
+    try {
+      resp = handleError(omResponse).getCurrentSecretKeyResponseProto();
+    } catch (OMException e) {
+      e.printStackTrace();
+    }
+
+    return ManagedSecretKey.fromProtobuf(resp);
   }
 
   /**
