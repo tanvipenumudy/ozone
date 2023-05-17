@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -76,7 +77,7 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
-  private final SecretKeyProtocol secretKeyClient;
+  private final SecretKeyProtocolScm secretKeyClient;
   private final boolean containerTokenEnabled;
   private final OzoneConfiguration configuration;
   private XceiverClientManager xceiverClientManager;
@@ -129,9 +130,14 @@ public class ContainerOperationClient implements ScmClient {
     return HAUtils.getScmContainerClient(configSource);
   }
 
-  public static SecretKeyProtocol newSecretKeyClient(
+  public static SecretKeyProtocolScm newSecretKeyClient(
       ConfigurationSource configSource) {
-    return HddsServerUtil.getScmSecretClient(configSource);
+    try {
+      return HddsServerUtil.getScmSecretClient(configSource);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return null;
+    }
   }
 
   @Override

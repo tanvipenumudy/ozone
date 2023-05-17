@@ -20,6 +20,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
@@ -55,15 +56,18 @@ public class SecretKeyProtocolServerSideTranslatorPB
       LoggerFactory.getLogger(SecretKeyProtocolServerSideTranslatorPB.class);
 
   private final SecretKeyProtocol impl;
+  private final SecretKeyProtocolScm implScm;
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecretKeyRequest,
       SCMSecretKeyResponse, ProtocolMessageEnum> dispatcher;
 
   public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocol impl,
+      SecretKeyProtocolScm implScm,
       StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
+    this.implScm = implScm;
     this.scm = storageContainerManager;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("SCMSecretKeyProtocol",
@@ -167,7 +171,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
   private SCMGetCheckAndRotateResponse checkAndRotate() throws
       TimeoutException {
     return SCMGetCheckAndRotateResponse.newBuilder()
-        .setStatus(impl.checkAndRotate()).build();
+        .setStatus(implScm.checkAndRotate()).build();
   }
 
   private Status exceptionToResponseStatus(IOException ex) {

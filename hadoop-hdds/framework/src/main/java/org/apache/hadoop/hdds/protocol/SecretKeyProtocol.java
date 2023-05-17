@@ -53,6 +53,4 @@ public interface SecretKeyProtocol {
    * @return list of ManagedSecretKey.
    */
   List<ManagedSecretKey> getAllSecretKeys() throws IOException;
-
-  boolean checkAndRotate() throws TimeoutException;
 }

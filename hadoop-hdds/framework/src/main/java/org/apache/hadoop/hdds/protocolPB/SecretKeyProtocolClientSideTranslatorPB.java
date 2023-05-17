@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
@@ -51,7 +52,7 @@ import java.util.stream.Collectors;
  * {@link SecretKeyProtocol} to the server proxy.
  */
 public class SecretKeyProtocolClientSideTranslatorPB implements
-    SecretKeyProtocol, ProtocolTranslator, Closeable {
+    SecretKeyProtocol, SecretKeyProtocolScm, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.

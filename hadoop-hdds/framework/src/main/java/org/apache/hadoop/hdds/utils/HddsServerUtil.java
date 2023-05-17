@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
@@ -512,21 +513,16 @@ public final class HddsServerUtil {
         SCMSecurityProtocol.class, conf);
   }
 
-  public static SecretKeyProtocol getScmSecretClient(
-      ConfigurationSource conf) {
-    SecretKeyProtocolFailoverProxyProvider proxyProvider =
-        null;
-    try {
-      proxyProvider = new SecretKeyProtocolFailoverProxyProvider(conf,
-          UserGroupInformation.getCurrentUser(), SecretKeyProtocolScmPB.class);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+  public static SecretKeyProtocolScm getScmSecretClient(
+      ConfigurationSource conf) throws IOException {
     SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
-        new SecretKeyProtocolClientSideTranslatorPB(proxyProvider,
-            SecretKeyProtocolScmPB.class);
-    return TracingUtil.createProxy(scmSecretClient, SecretKeyProtocol.class,
-        conf);
+        new SecretKeyProtocolClientSideTranslatorPB(
+            new SecretKeyProtocolFailoverProxyProvider(conf,
+                UserGroupInformation.getCurrentUser(),
+                SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
+
+    return TracingUtil.createProxy(scmSecretClient,
+        SecretKeyProtocolScm.class, conf);
   }
 
   /**
