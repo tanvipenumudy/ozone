@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -59,6 +60,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -83,10 +85,7 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.*;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.assertExceptionContains;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -112,6 +111,7 @@ public final class TestBlockTokens {
   public Timeout timeout = Timeout.seconds(180);
 
   private static MiniKdc miniKdc;
+  private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
   private static File workDir;
   private static File ozoneKeytab;
@@ -121,6 +121,7 @@ public final class TestBlockTokens {
   private static String host;
   private static String clusterId;
   private static String scmId;
+  private static String omId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
   private static BlockInputStreamFactory blockInputStreamFactory =
@@ -128,8 +129,10 @@ public final class TestBlockTokens {
 
   @BeforeClass
   public static void init() throws Exception {
+    ozoneAdmin = new OzoneAdmin();
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+    conf.set(OZONE_OM_SERVICE_IDS_KEY, "ozone1");
 
     ExitUtils.disableSystemExit();
 
@@ -137,6 +140,7 @@ public final class TestBlockTokens {
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+    omId = UUID.randomUUID().toString();;
 
     startMiniKdc();
     setSecureConfig();
@@ -271,6 +275,11 @@ public final class TestBlockTokens {
     assertExceptionContains("Invalid token for user", ex);
   }
 
+  @Test
+  public void testGetCurrentSecretKey() {
+    String[] args = {"om", "fetch-current-key", "-id=ozone1"};
+    ozoneAdmin.execute(args);
+  }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
@@ -383,7 +392,9 @@ public final class TestBlockTokens {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKey")
+        .setOMServiceId("ozone1")
         .setScmId(scmId)
+        .setOmId(omId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(1);
