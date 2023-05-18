@@ -44,6 +44,7 @@ message SCMDatanodeRequest {
   optional SCMVersionRequestProto getVersionRequest = 3;
   optional SCMRegisterRequestProto registerRequest = 4;
   optional SCMHeartbeatRequestProto sendHeartbeatRequest = 5;
+  optional SCMSecretKeysListRequestProto secretKeysListRequest = 6;
 }
 
 message SCMDatanodeResponse {
@@ -60,18 +61,21 @@ message SCMDatanodeResponse {
   optional SCMVersionResponseProto getVersionResponse = 6;
   optional SCMRegisteredResponseProto registerResponse = 7;
   optional SCMHeartbeatResponseProto sendHeartbeatResponse = 8;
-
+  optional SCMSecretKeysListResponseProto secretKeysListResponse = 9;
 }
 
 enum Type {
   GetVersion = 1;
   Register = 2;
   SendHeartbeat = 3;
+  GetAllSecretKeys = 4;
 }
 
 enum Status {
   OK = 1;
   ERROR = 2;
+  SECRET_KEY_NOT_ENABLED = 3;
+  SECRET_KEY_NOT_INITIALIZED = 4;
 }
 
 /**
@@ -87,6 +91,8 @@ message LayoutVersionProto {
  * Request for version info of the software stack on the server.
  */
 message SCMVersionRequestProto {}
+
+message SCMSecretKeysListRequestProto {}
 
 /**
 * Generic response that is send to a version request. This allows keys to be
@@ -188,6 +194,18 @@ message MetadataStorageReportProto {
   optional uint64 scmUsed = 4 [default = 0];
   optional uint64 remaining = 5 [default = 0];
   optional bool failed = 6 [default = false];
+}
+
+message ManagedSecretKey {
+  required UUID id = 1;
+  required uint64 creationTime = 2;
+  required uint64 expiryTime = 3;
+  required string algorithm = 4;
+  required bytes encoded = 5;
+}
+
+message SCMSecretKeysListResponseProto {
+  repeated ManagedSecretKey secretKeys = 1;
 }
 
 /**

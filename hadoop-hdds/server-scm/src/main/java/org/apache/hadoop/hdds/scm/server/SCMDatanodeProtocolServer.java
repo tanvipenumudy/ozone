@@ -309,6 +309,12 @@ public class SCMDatanodeProtocolServer implements
     }
   }
 
+  @Override
+  public StorageContainerDatanodeProtocolProtos.SCMSecretKeysListResponseProto
+  getAllSecretKeys() {
+    return null;
+  }
+
   private OptionalLong getTermIfLeader() {
     if (scmContext != null && scmContext.isLeader()) {
       try {

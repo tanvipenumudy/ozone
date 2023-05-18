@@ -20,6 +20,7 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ExtendedDatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -149,6 +150,12 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
     return submitRequest(Type.SendHeartbeat,
         (builder) -> builder.setSendHeartbeatRequest(heartbeat))
         .getSendHeartbeatResponse();
+  }
+
+  @Override
+  public StorageContainerDatanodeProtocolProtos.SCMSecretKeysListResponseProto
+  getAllSecretKeys() {
+    return null;
   }
 
   /**

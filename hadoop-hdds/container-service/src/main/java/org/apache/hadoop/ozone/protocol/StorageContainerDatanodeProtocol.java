@@ -36,6 +36,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.SCMSecretKeysListResponseProto;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -73,6 +75,8 @@ public interface StorageContainerDatanodeProtocol {
    */
   SCMHeartbeatResponseProto sendHeartbeat(SCMHeartbeatRequestProto heartbeat)
       throws IOException, TimeoutException;
+
+  SCMSecretKeysListResponseProto getAllSecretKeys();
 
   /**
    * Register Datanode.
