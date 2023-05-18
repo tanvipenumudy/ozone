@@ -166,7 +166,7 @@ public final class ManagedSecretKey {
     return new ManagedSecretKey(id, creationTime, expiryTime, secretKey);
   }
 
-  public static OzoneManagerProtocolProtos.ManagedSecretKey toProtobuf(
+  public static OzoneManagerProtocolProtos.ManagedSecretKey toProto(
       ManagedSecretKey secretKey) {
     OzoneManagerProtocolProtos.ManagedSecretKey.Builder builder =
         OzoneManagerProtocolProtos.ManagedSecretKey.newBuilder();

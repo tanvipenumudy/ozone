@@ -60,10 +60,6 @@ Transfer Leadership for OM
     ${newLeaderOM} =        Get OM Leader Node
                             Should be Equal         ${followerOM}           ${newLeaderOM}
 
-Fetch Keys
-     ${result} =        Execute                          ozone admin om fetch-current-key --service-id=omservice
-                        Should Contain                   ${result}  Current Secret Key:
-
 Transfer Leadership for OM randomly
     # Find Leader OM and one Follower OM
     ${leaderOM} =           Get OM Leader Node

@@ -958,7 +958,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ManagedSecretKey managedSecretKey = impl.getCurrentSecretKey();
     GetCurrentSecretKeyResponse response =
         GetCurrentSecretKeyResponse.newBuilder()
-            .setSecretKey(ManagedSecretKey.toProtobuf(managedSecretKey))
+            .setSecretKey(ManagedSecretKey.toProto(managedSecretKey))
             .build();
     return response;
   }
