@@ -544,6 +544,9 @@ public class TestOzoneShellHA {
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
+
+    args = new String[] {"om", "fetch-current-key", "--service-id=om-service-test1"};
+    execute(ozoneAdminShell, args);
   }
 
   /**

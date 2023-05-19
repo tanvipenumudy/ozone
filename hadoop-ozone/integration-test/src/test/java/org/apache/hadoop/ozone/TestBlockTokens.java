@@ -277,7 +277,7 @@ public final class TestBlockTokens {
 
   @Test
   public void testGetCurrentSecretKey() {
-    String[] args = {"om", "fetch-current-key", "-id=ozone1"};
+    String[] args = {"om", "fetch-current-key", "--service-id=ozone1"};
     ozoneAdmin.execute(args);
   }
 
