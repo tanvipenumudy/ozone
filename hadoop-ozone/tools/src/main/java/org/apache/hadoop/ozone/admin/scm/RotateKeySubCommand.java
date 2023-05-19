@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -23,12 +24,15 @@ public class RotateKeySubCommand extends ScmSubcommand {
 
   @Override
   protected void execute(ScmClient scmClient) throws IOException {
-    boolean status = false;
-    try {
-      status = scmClient.checkAndRotate();
-    } catch (TimeoutException e) {
-      e.printStackTrace();
+    try (ScmClient client = new ContainerOperationClient(
+        parent.getParent().getOzoneConf())) {
+      boolean status = false;
+      try {
+        status = client.checkAndRotate(true);
+      } catch (TimeoutException e) {
+        e.printStackTrace();
+      }
+      System.out.println("Rotate Status: " + status);
     }
-    System.out.println("Rotate Status: " + status);
   }
 }

@@ -111,7 +111,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
       case GetCheckAndRotate:
         try {
           return scmSecurityResponse
-              .setCheckAndRotateResponseProto(checkAndRotate())
+              .setCheckAndRotateResponseProto(checkAndRotate(request.getCheckAndRotateRequest().getForce()))
               .build();
         } catch (TimeoutException e) {
           e.printStackTrace();
@@ -168,10 +168,10 @@ public class SecretKeyProtocolServerSideTranslatorPB
         .build();
   }
 
-  private SCMGetCheckAndRotateResponse checkAndRotate() throws
+  private SCMGetCheckAndRotateResponse checkAndRotate(boolean force) throws
       TimeoutException {
     return SCMGetCheckAndRotateResponse.newBuilder()
-        .setStatus(implScm.checkAndRotate()).build();
+        .setStatus(implScm.checkAndRotate(force)).build();
   }
 
   private Status exceptionToResponseStatus(IOException ex) {

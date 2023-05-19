@@ -363,7 +363,7 @@ public interface ScmClient extends Closeable {
    */
   List<String> getScmRatisRoles() throws IOException;
 
-  boolean checkAndRotate() throws TimeoutException;
+  boolean checkAndRotate(boolean force) throws TimeoutException;
 
   /**
    * Transfer the raft leadership.

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -52,6 +53,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,12 +129,13 @@ public final class TestBlockTokens {
   private static String scmId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
+
+  private static ContainerOperationClient scmClient;
   private static BlockInputStreamFactory blockInputStreamFactory =
       new BlockInputStreamFactoryImpl();
 
   @BeforeClass
   public static void init() throws Exception {
-    ozoneAdmin = new OzoneAdmin();
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
@@ -149,6 +152,8 @@ public final class TestBlockTokens {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
+    scmClient = new ContainerOperationClient(conf);
+    ozoneAdmin = new OzoneAdmin(conf);
     createTestData();
   }
 
@@ -276,15 +281,8 @@ public final class TestBlockTokens {
     assertExceptionContains("Invalid token for user", ex);
   }
 
-  @Test
-  public void testCheckAndRotateKeyDraft() {
-//    conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION,
-//        HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT);
-    InetSocketAddress address =
-        cluster.getStorageContainerManager().getClientRpcAddress();
-    String hostPort = address.getHostName() + ":" + address.getPort();
-    String[] args = {"scm", "rotate", "--scm", hostPort};
-    ozoneAdmin.execute(args);
+  private String getSetConfStringFromConf(String key) {
+    return String.format("--set=%s=%s", key, conf.get(key));
   }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
@@ -391,6 +389,27 @@ public final class TestBlockTokens {
     conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
         ozoneKeytab.getAbsolutePath());
   }
+
+  @Test
+  public void testCheckAndRotateKeyDraft()
+      throws InterruptedException, TimeoutException, IOException {
+    GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 3000, 20000);
+    InetSocketAddress address =
+        cluster.getScmLeader().getClientRpcAddress();
+    String hostPort = address.getHostName() + ":" + address.getPort();
+    String[] args = { "scm", "rotate","--scm", hostPort};
+
+    String oldKey =
+        scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
+    Thread.sleep(4000);
+    ozoneAdmin.execute(args);
+//  or also could use the client directly like below
+//  scmClient.checkAndRotate();
+    String newKey =
+        scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
+    Assertions.assertNotEquals(oldKey,newKey);
+  }
+
 
   private static void startCluster()
       throws IOException, TimeoutException, InterruptedException {

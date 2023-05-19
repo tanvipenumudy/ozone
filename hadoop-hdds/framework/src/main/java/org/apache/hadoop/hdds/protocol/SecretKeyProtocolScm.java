@@ -31,5 +31,5 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 )
 public interface SecretKeyProtocolScm extends SecretKeyProtocol {
 
-  boolean checkAndRotate() throws TimeoutException;
+  boolean checkAndRotate(boolean force) throws TimeoutException;
 }

@@ -235,13 +235,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public boolean checkAndRotate() throws TimeoutException {
+  public boolean checkAndRotate(boolean force) throws TimeoutException {
     try {
       validateSecretKeyStatus();
     } catch (SCMSecretKeyException e) {
       e.printStackTrace();
     }
-    return secretKeyManager.checkAndRotate();
+    return secretKeyManager.checkAndRotate(force);
   }
 
   /**

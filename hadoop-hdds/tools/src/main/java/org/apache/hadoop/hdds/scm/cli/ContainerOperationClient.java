@@ -483,8 +483,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public boolean checkAndRotate() throws TimeoutException {
-    return secretKeyClient.checkAndRotate();
+  public boolean checkAndRotate(boolean force) throws TimeoutException {
+    return secretKeyClient.checkAndRotate(force);
   }
 
   @Override
@@ -539,4 +539,7 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.decommissionScm(scmId);
   }
 
+  public SecretKeyProtocolScm getSecretKeyClient() {
+    return secretKeyClient;
+  }
 }
