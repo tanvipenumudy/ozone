@@ -24,7 +24,6 @@ import org.apache.hadoop.security.KerberosInfo;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The protocol used to expose secret keys in SCM.

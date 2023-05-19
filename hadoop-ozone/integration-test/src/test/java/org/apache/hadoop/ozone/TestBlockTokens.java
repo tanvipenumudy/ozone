@@ -78,7 +78,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
@@ -397,7 +396,7 @@ public final class TestBlockTokens {
     InetSocketAddress address =
         cluster.getScmLeader().getClientRpcAddress();
     String hostPort = address.getHostName() + ":" + address.getPort();
-    String[] args = { "scm", "rotate","--scm", hostPort};
+    String[] args = {"scm", "rotate", "--scm", hostPort};
 
     String oldKey =
         scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
@@ -405,7 +404,7 @@ public final class TestBlockTokens {
     ozoneAdmin.execute(args);
     String newKey =
         scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
-    Assertions.assertNotEquals(oldKey,newKey);
+    Assertions.assertNotEquals(oldKey, newKey);
   }
 
 

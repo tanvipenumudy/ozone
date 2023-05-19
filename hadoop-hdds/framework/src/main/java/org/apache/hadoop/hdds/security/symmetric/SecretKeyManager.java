@@ -109,7 +109,8 @@ public class SecretKeyManager implements SecretKeyClient {
    *
    * @return true if rotation actually happens, false if it doesn't.
    */
-  public synchronized boolean checkAndRotate(boolean force) throws TimeoutException {
+  public synchronized boolean checkAndRotate(boolean force)
+      throws TimeoutException {
     // Initialize the state if it's not initialized already.
     checkAndInitialize();
 
