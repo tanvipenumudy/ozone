@@ -109,12 +109,13 @@ public class SecretKeyManager implements SecretKeyClient {
    *
    * @return true if rotation actually happens, false if it doesn't.
    */
-  public synchronized boolean checkAndRotate() throws TimeoutException {
+  public synchronized boolean checkAndRotate(boolean force)
+      throws TimeoutException {
     // Initialize the state if it's not initialized already.
     checkAndInitialize();
 
     ManagedSecretKey currentKey = state.getCurrentKey();
-    if (shouldRotate(currentKey)) {
+    if (shouldRotate(currentKey) || force) {
       ManagedSecretKey newCurrentKey = generateSecretKey();
       List<ManagedSecretKey> updatedKeys = state.getSortedKeys()
           .stream().filter(x -> !x.isExpired())

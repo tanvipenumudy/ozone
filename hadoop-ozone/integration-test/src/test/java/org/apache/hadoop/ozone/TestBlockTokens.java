@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -51,6 +53,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +62,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -112,6 +116,7 @@ public final class TestBlockTokens {
   public Timeout timeout = Timeout.seconds(180);
 
   private static MiniKdc miniKdc;
+  private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
   private static File workDir;
   private static File ozoneKeytab;
@@ -123,6 +128,8 @@ public final class TestBlockTokens {
   private static String scmId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
+
+  private static ContainerOperationClient scmClient;
   private static BlockInputStreamFactory blockInputStreamFactory =
       new BlockInputStreamFactoryImpl();
 
@@ -144,6 +151,8 @@ public final class TestBlockTokens {
     setSecretKeysConfig();
     startCluster();
     client = cluster.newClient();
+    scmClient = new ContainerOperationClient(conf);
+    ozoneAdmin = new OzoneAdmin(conf);
     createTestData();
   }
 
@@ -375,6 +384,24 @@ public final class TestBlockTokens {
         spnegoKeytab.getAbsolutePath());
     conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY,
         ozoneKeytab.getAbsolutePath());
+  }
+
+  @Test
+  public void testRotateKeySCMAdminCommand()
+      throws InterruptedException, TimeoutException, IOException {
+    GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 100, 1000);
+    InetSocketAddress address =
+        cluster.getScmLeader().getClientRpcAddress();
+    String hostPort = address.getHostName() + ":" + address.getPort();
+    String[] args = {"scm", "rotate", "--scm", hostPort};
+
+    String oldKey =
+        scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
+    Thread.sleep(1000);
+    ozoneAdmin.execute(args);
+    String newKey =
+        scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
+    Assertions.assertNotEquals(oldKey, newKey);
   }
 
   private static void startCluster()

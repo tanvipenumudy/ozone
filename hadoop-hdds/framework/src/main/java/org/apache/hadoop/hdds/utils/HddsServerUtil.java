@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
@@ -509,6 +510,18 @@ public final class HddsServerUtil {
             new SCMSecurityProtocolFailoverProxyProvider(conf, ugi));
     return TracingUtil.createProxy(scmSecurityClient,
         SCMSecurityProtocol.class, conf);
+  }
+
+  public static SecretKeyProtocolScm getScmSecretClient(
+      ConfigurationSource conf) throws IOException {
+    SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
+        new SecretKeyProtocolClientSideTranslatorPB(
+            new SecretKeyProtocolFailoverProxyProvider(conf,
+                UserGroupInformation.getCurrentUser(),
+                SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
+
+    return TracingUtil.createProxy(scmSecretClient,
+        SecretKeyProtocolScm.class, conf);
   }
 
   /**

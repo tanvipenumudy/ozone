@@ -20,6 +20,8 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyResponse;
@@ -41,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -53,15 +56,18 @@ public class SecretKeyProtocolServerSideTranslatorPB
       LoggerFactory.getLogger(SecretKeyProtocolServerSideTranslatorPB.class);
 
   private final SecretKeyProtocol impl;
+  private final SecretKeyProtocolScm implScm;
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecretKeyRequest,
       SCMSecretKeyResponse, ProtocolMessageEnum> dispatcher;
 
   public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocol impl,
+      SecretKeyProtocolScm implScm,
       StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
+    this.implScm = implScm;
     this.scm = storageContainerManager;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("SCMSecretKeyProtocol",
@@ -101,6 +107,16 @@ public class SecretKeyProtocolServerSideTranslatorPB
         return scmSecurityResponse
             .setSecretKeysListResponseProto(getAllSecretKeys())
             .build();
+
+      case GetCheckAndRotate:
+        try {
+          return scmSecurityResponse
+              .setCheckAndRotateResponseProto(
+                  checkAndRotate(request.getCheckAndRotateRequest().getForce()))
+              .build();
+        } catch (TimeoutException e) {
+          e.printStackTrace();
+        }
 
       default:
         throw new IllegalArgumentException(
@@ -151,6 +167,12 @@ public class SecretKeyProtocolServerSideTranslatorPB
     return SCMGetCurrentSecretKeyResponse.newBuilder()
         .setSecretKey(impl.getCurrentSecretKey().toProtobuf())
         .build();
+  }
+
+  private SCMGetCheckAndRotateResponse checkAndRotate(boolean force) throws
+      TimeoutException {
+    return SCMGetCheckAndRotateResponse.newBuilder()
+        .setStatus(implScm.checkAndRotate(force)).build();
   }
 
   private Status exceptionToResponseStatus(IOException ex) {
