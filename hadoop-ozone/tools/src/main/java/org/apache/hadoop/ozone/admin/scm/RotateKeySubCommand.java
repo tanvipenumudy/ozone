@@ -32,7 +32,9 @@ public class RotateKeySubCommand extends ScmSubcommand {
       } catch (TimeoutException e) {
         e.printStackTrace();
       }
-      System.out.println("Rotate Status: " + status);
+      System.out.println(
+          "Secret key rotation is complete, new key has been generated. " +
+              "Rotate Status: " + status);
     }
   }
 }

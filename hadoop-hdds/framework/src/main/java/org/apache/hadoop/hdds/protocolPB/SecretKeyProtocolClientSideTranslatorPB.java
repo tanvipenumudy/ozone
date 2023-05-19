@@ -135,12 +135,12 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
   public boolean checkAndRotate(boolean force) throws TimeoutException {
     boolean checkAndRotateStatus = false;
     try {
-      SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest request=
+      SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest request =
           SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest.newBuilder()
               .setForce(force)
               .build();
       checkAndRotateStatus = submitRequest(Type.GetCheckAndRotate, builder ->
-        builder.setCheckAndRotateRequest(request))
+          builder.setCheckAndRotateRequest(request))
           .getCheckAndRotateResponseProto().getStatus();
     } catch (IOException e) {
       e.printStackTrace();

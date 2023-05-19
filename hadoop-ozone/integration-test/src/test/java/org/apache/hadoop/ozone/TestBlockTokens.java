@@ -391,7 +391,7 @@ public final class TestBlockTokens {
   }
 
   @Test
-  public void testCheckAndRotateKeyDraft()
+  public void testRotateKeySCMAdminCommand()
       throws InterruptedException, TimeoutException, IOException {
     GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 3000, 20000);
     InetSocketAddress address =
@@ -403,8 +403,6 @@ public final class TestBlockTokens {
         scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
     Thread.sleep(4000);
     ozoneAdmin.execute(args);
-//  or also could use the client directly like below
-//  scmClient.checkAndRotate();
     String newKey =
         scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
     Assertions.assertNotEquals(oldKey,newKey);

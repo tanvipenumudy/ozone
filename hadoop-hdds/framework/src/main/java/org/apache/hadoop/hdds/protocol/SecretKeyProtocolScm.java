@@ -31,5 +31,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 )
 public interface SecretKeyProtocolScm extends SecretKeyProtocol {
 
+  /**
+   * Force generates new secret keys (rotate).
+   *
+   * @param force boolean flag that forcefully rotates the key on demand
+   * @return
+   * @throws TimeoutException
+   */
   boolean checkAndRotate(boolean force) throws TimeoutException;
 }
