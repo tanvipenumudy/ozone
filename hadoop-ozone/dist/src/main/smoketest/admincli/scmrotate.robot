@@ -23,6 +23,6 @@ Test Timeout        5 minutes
 *** Variables ***
 
 *** Test Cases ***
-Run scm roles
+SCM Rotate Keys
     ${output} =         Execute          ozone admin scm rotate
                         Should contain   ${output}  Rotate Status: true
