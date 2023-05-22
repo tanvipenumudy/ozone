@@ -134,7 +134,7 @@ public class ContainerOperationClient implements ScmClient {
     try {
       return HddsServerUtil.getScmSecretClient(configSource);
     } catch (IOException e) {
-      e.printStackTrace();
+      LOG.error("Error while getting the SCM secret client.", e);
       return null;
     }
   }

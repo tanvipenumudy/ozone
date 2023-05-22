@@ -239,7 +239,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     try {
       validateSecretKeyStatus();
     } catch (SCMSecretKeyException e) {
-      e.printStackTrace();
+      LOGGER.error("Error while validating the secret key status.", e);
     }
     return secretKeyManager.checkAndRotate(force);
   }

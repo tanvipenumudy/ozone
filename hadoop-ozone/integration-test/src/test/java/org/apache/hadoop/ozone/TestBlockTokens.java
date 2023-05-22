@@ -397,7 +397,6 @@ public final class TestBlockTokens {
 
     String oldKey =
         scmClient.getSecretKeyClient().getCurrentSecretKey().toString();
-    Thread.sleep(1000);
     ozoneAdmin.execute(args);
     String newKey =
         scmClient.getSecretKeyClient().getCurrentSecretKey().toString();

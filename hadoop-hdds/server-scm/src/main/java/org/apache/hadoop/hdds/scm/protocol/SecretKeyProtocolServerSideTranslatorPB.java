@@ -115,7 +115,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
                   checkAndRotate(request.getCheckAndRotateRequest().getForce()))
               .build();
         } catch (TimeoutException e) {
-          e.printStackTrace();
+          LOG.error("Timeout occurred while executing checkAndRotate.", e);
         }
 
       default:
