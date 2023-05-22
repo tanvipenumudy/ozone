@@ -370,7 +370,7 @@ public interface ScmClient extends Closeable {
    * @return
    * @throws TimeoutException
    */
-  boolean checkAndRotate(boolean force) throws TimeoutException;
+  boolean checkAndRotate(boolean force) throws TimeoutException, IOException;
 
   /**
    * Transfer the raft leadership.

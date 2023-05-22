@@ -170,7 +170,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
   }
 
   private SCMGetCheckAndRotateResponse checkAndRotate(boolean force) throws
-      TimeoutException {
+      TimeoutException, IOException {
     return SCMGetCheckAndRotateResponse.newBuilder()
         .setStatus(implScm.checkAndRotate(force)).build();
   }

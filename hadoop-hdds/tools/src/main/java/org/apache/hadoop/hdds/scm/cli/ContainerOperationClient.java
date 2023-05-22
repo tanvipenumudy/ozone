@@ -482,7 +482,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public boolean checkAndRotate(boolean force) throws TimeoutException {
+  public boolean checkAndRotate(boolean force)
+      throws TimeoutException, IOException {
     return secretKeyClient.checkAndRotate(force);
   }
 
