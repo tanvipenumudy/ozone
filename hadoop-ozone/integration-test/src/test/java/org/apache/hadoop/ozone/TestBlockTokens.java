@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -61,9 +62,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import javax.crypto.SecretKey;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.*;
@@ -130,6 +130,7 @@ public final class TestBlockTokens {
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
   private static OzoneShell ozoneShell;
+  private static ContainerOperationClient scmClient;
   private static BlockInputStreamFactory blockInputStreamFactory =
       new BlockInputStreamFactoryImpl();
 
@@ -156,9 +157,10 @@ public final class TestBlockTokens {
     setSecureConfig();
     createCredentialsInKDC();
     setSecretKeysConfig();
-    ozoneAdmin = new OzoneAdmin(conf);
     startCluster();
     client = cluster.newClient();
+    ozoneAdmin = new OzoneAdmin(conf);
+    scmClient = new ContainerOperationClient(conf);
     createTestData();
   }
 
@@ -243,8 +245,6 @@ public final class TestBlockTokens {
 
     String[] omNodesArr = omNodesVal.split(",");
     // Sanity check
-    System.out.println(numOfOMs);
-    System.out.println(omNodesArr.length);
     assert (omNodesArr.length == numOfOMs);
     for (int i = 0; i < numOfOMs; i++) {
       res[indexOmAddressStart + i] =
@@ -370,8 +370,34 @@ public final class TestBlockTokens {
 
   @Test
   public void testGetCurrentSecretKey() {
-    String[] args = new String[] {"om", "fetch-current-key", "--service-id=om-service-test1"};
-    execute(ozoneAdmin, args);
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    PrintStream printStream = new PrintStream(outputStream);
+    System.setOut(printStream);
+
+    String[] args =
+        new String[]{"om", "fetch-current-key", "--service-id=" + omServiceId};
+    ozoneAdmin.execute(args);
+
+    String actualOutput = outputStream.toString();
+    System.setOut(System.out);
+
+    String actualCurrentKey = testGetCurrentSecretKeyUtil(actualOutput);
+    SecretKey key =
+        getScmSecretKeyManager().getCurrentSecretKey().getSecretKey();
+    byte[] encodedKey = key.getEncoded();
+    String expectedCurrentKey = Base64.getEncoder().encodeToString(encodedKey);
+    assertEquals(expectedCurrentKey, actualCurrentKey);
+  }
+
+  private String testGetCurrentSecretKeyUtil(String output) {
+    // Extract the current secret key from the output
+    String[] lines = output.split(System.lineSeparator());
+    for (String line : lines) {
+      if (line.startsWith("Current Secret Key: ")) {
+        return line.substring("Current Secret Key: ".length()).trim();
+      }
+    }
+    return null;
   }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {

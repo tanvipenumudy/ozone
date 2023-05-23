@@ -1,11 +1,14 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
+import java.util.Base64;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
+
+import javax.crypto.SecretKey;
 
 /**
  * Handler of ozone admin om fetch-current-key command.
@@ -31,8 +34,10 @@ public class FetchKeySubCommand implements Callable<Void> {
   public Void call() throws Exception {
     OzoneManagerProtocol client = parent.createOmClient(omServiceId);
     ManagedSecretKey managedSecretKey = client.getCurrentSecretKey();
-    System.out.println(
-        "Current Secret Key: " + managedSecretKey.getSecretKey());
+    SecretKey key = managedSecretKey.getSecretKey();
+    byte[] encodedKey = key.getEncoded();
+    String keyString = Base64.getEncoder().encodeToString(encodedKey);
+    System.out.println("Current Secret Key: " + keyString);
     return null;
   }
 }
