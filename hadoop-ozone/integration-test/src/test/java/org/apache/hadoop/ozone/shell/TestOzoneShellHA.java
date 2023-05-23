@@ -516,10 +516,12 @@ public class TestOzoneShellHA {
   @Test
   public void testOzoneAdminCmdList() throws UnsupportedEncodingException {
     // Part of listing keys test.
+    String [] args = new String[] {"om", "fetch-current-key", "--service-id=om-service-test1"};
+    execute(ozoneAdminShell, args);
     generateKeys("/volume6", "/bucket");
     // Test case 1: list OPEN container
     String state = "--state=OPEN";
-    String[] args = new String[] {"container", "list", "--scm",
+    args = new String[] {"container", "list", "--scm",
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         state};
     execute(ozoneAdminShell, args);
@@ -545,8 +547,8 @@ public class TestOzoneShellHA {
         factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
 
-    args = new String[] {"om", "fetch-current-key", "--service-id=om-service-test1"};
-    execute(ozoneAdminShell, args);
+//    args = new String[] {"om", "fetch-current-key", "--service-id=om-service-test1"};
+//    execute(ozoneAdminShell, args);
   }
 
   /**

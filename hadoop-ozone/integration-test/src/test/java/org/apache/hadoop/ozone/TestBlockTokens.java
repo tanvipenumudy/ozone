@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,11 +40,14 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.shell.OzoneShell;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
@@ -55,15 +59,14 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -121,18 +124,23 @@ public final class TestBlockTokens {
   private static String host;
   private static String clusterId;
   private static String scmId;
+  private static int numOfOMs;
+  private static String omServiceId;
   private static String omId;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
+  private static OzoneShell ozoneShell;
   private static BlockInputStreamFactory blockInputStreamFactory =
       new BlockInputStreamFactoryImpl();
 
   @BeforeClass
   public static void init() throws Exception {
-    ozoneAdmin = new OzoneAdmin();
+
+    ozoneShell = new OzoneShell();
     conf = new OzoneConfiguration();
+
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-    conf.set(OZONE_OM_SERVICE_IDS_KEY, "ozone1");
+    //conf.set(OZONE_OM_SERVICE_IDS_KEY, "om-service-test1");
 
     ExitUtils.disableSystemExit();
 
@@ -140,12 +148,15 @@ public final class TestBlockTokens {
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
+    numOfOMs = 3;
+    omServiceId = "om-service-test1";
     omId = UUID.randomUUID().toString();;
 
     startMiniKdc();
     setSecureConfig();
     createCredentialsInKDC();
     setSecretKeysConfig();
+    ozoneAdmin = new OzoneAdmin(conf);
     startCluster();
     client = cluster.newClient();
     createTestData();
@@ -160,6 +171,88 @@ public final class TestBlockTokens {
     try (OzoneOutputStream out = bucket.createKey(TEST_FILE, data.length)) {
       org.apache.commons.io.IOUtils.write(data, out);
     }
+  }
+
+  private void execute(GenericCli shell, String[] args) {
+    LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
+    CommandLine cmd = shell.getCmd();
+
+    CommandLine.IExceptionHandler2<List<Object>> exceptionHandler =
+        new CommandLine.IExceptionHandler2<List<Object>>() {
+          @Override
+          public List<Object> handleParseException(
+              CommandLine.ParameterException ex,
+              String[] args) {
+            throw ex;
+          }
+
+          @Override
+          public List<Object> handleExecutionException(
+              CommandLine.ExecutionException ex,
+              CommandLine.ParseResult parseRes) {
+            throw ex;
+          }
+        };
+
+    // Since there is no elegant way to pass Ozone config to the shell,
+    // the idea is to use 'set' to place those OM HA configs.
+    String[] argsWithHAConf = getHASetConfStrings(args);
+
+    cmd.parseWithHandlers(new CommandLine.RunLast(), exceptionHandler, argsWithHAConf);
+  }
+
+  /**
+   * Helper function to create a new set of arguments that contains HA configs.
+   * @param existingArgs Existing arguments to be fed into OzoneShell command.
+   * @return String array.
+   */
+  private String[] getHASetConfStrings(String[] existingArgs) {
+    // Get a String array populated with HA configs first
+    String[] res = getHASetConfStrings(existingArgs.length);
+
+    int indexCopyStart = res.length - existingArgs.length;
+    // Then copy the existing args to the returned String array
+    for (int i = 0; i < existingArgs.length; i++) {
+      res[indexCopyStart + i] = existingArgs[i];
+    }
+    return res;
+  }
+
+  private String getSetConfStringFromConf(String key) {
+    return String.format("--set=%s=%s", key, cluster.getConf().get(key));
+  }
+
+  private String generateSetConfString(String key, String value) {
+    return String.format("--set=%s=%s", key, value);
+  }
+
+  private String[] getHASetConfStrings(int numOfArgs) {
+    assert (numOfArgs >= 0);
+    String[] res = new String[1 + 1 + numOfOMs + numOfArgs];
+    final int indexOmServiceIds = 0;
+    final int indexOmNodes = 1;
+    final int indexOmAddressStart = 2;
+
+    res[indexOmServiceIds] = getSetConfStringFromConf(
+        OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
+
+    String omNodesKey = ConfUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
+    String omNodesVal = cluster.getConf().get(omNodesKey);
+    res[indexOmNodes] = generateSetConfString(omNodesKey, omNodesVal);
+
+    String[] omNodesArr = omNodesVal.split(",");
+    // Sanity check
+    System.out.println(numOfOMs);
+    System.out.println(omNodesArr.length);
+    assert (omNodesArr.length == numOfOMs);
+    for (int i = 0; i < numOfOMs; i++) {
+      res[indexOmAddressStart + i] =
+          getSetConfStringFromConf(ConfUtils.addKeySuffixes(
+              OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodesArr[i]));
+    }
+
+    return res;
   }
 
   @AfterClass
@@ -277,8 +370,8 @@ public final class TestBlockTokens {
 
   @Test
   public void testGetCurrentSecretKey() {
-    String[] args = {"om", "fetch-current-key", "--service-id=ozone1"};
-    ozoneAdmin.execute(args);
+    String[] args = new String[] {"om", "fetch-current-key", "--service-id=om-service-test1"};
+    execute(ozoneAdmin, args);
   }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
@@ -392,12 +485,12 @@ public final class TestBlockTokens {
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKey")
-        .setOMServiceId("ozone1")
+        .setOMServiceId("om-service-test1")
         .setScmId(scmId)
         .setOmId(omId)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .setNumOfStorageContainerManagers(3)
-        .setNumOfOzoneManagers(1);
+        .setNumOfOzoneManagers(numOfOMs);
 
     cluster = (MiniOzoneHAClusterImpl) builder.build();
     cluster.waitForClusterToBeReady();
