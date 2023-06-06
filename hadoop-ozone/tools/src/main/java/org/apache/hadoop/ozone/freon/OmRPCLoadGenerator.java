@@ -68,6 +68,11 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
                           "Max size is 2097151 KB",
           defaultValue = "0")
   private int payloadRespSizeKB = 0;
+
+  @Option(names = {"--ratis"},
+      description = "Send RPC requests to Ratis")
+  private boolean sendToRatis = false;
+
   @Override
   public Void call() throws Exception {
     Preconditions.checkArgument(payloadReqSizeKB >= 0,
@@ -111,7 +116,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private void sendRPCReq(long l) throws Exception {
     timer.time(() -> {
       clients[(int) (l % clientsCount)].echoRPCReq(payloadReqBytes,
-              payloadRespSize);
+              payloadRespSize, sendToRatis);
       return null;
     });
   }
