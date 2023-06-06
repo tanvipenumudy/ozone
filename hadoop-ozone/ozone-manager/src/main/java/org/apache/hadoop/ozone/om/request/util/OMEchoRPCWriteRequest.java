@@ -22,6 +22,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 /**
@@ -36,6 +38,10 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
                                                  long transactionLogIndex,
                                                  OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-    return null;
+    OMClientResponse omClientResponse = null;
+    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
+        OmResponseUtil.getOMResponseBuilder(getOmRequest());
+    omClientResponse = new OMEchoRPCWriteResponse(omResponse.build());
+    return omClientResponse;
   }
 }
