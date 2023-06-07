@@ -2182,7 +2182,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             EchoRPCRequest.newBuilder()
                     .setPayloadReq(ByteString.copyFrom(payloadReq))
                     .setPayloadSizeResp(payloadSizeResp)
-                    .setReadOnly(sendToRatis)
+                    .setReadOnly(!sendToRatis)
                     .build();
 
     OMRequest omRequest = createOMRequest(Type.EchoRPC)
