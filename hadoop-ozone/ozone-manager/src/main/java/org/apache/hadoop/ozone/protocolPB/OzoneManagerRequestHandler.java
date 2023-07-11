@@ -338,6 +338,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         SetSafeModeResponse setSafeModeResponse =
             setSafeMode(request.getSetSafeModeRequest());
         responseBuilder.setSetSafeModeResponse(setSafeModeResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
