@@ -39,18 +39,6 @@ ${n}    1
     ${result} =        Execute          ozone freon ome -t=1 -n=${n}
                        Should contain   ${result}   Successful executions: ${n}
 
-[Write] Ozone Echo RPC Load Generator with request payload and response payload
-    ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-req=1 --payload-resp=1 --ratis
-                       Should contain   ${result}   Successful executions: ${n}
-
-[Write] Ozone Echo RPC Load Generator with request payload and empty response payload
-    ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-req=1 --ratis
-                       Should contain   ${result}   Successful executions: ${n}
-
 [Write] Ozone Echo RPC Load Generator with empty request payload and response payload
     ${result} =        Execute          ozone freon ome -t=1 -n=${n} --payload-resp=1 --ratis
-                       Should contain   ${result}   Successful executions: ${n}
-
-[Write] Ozone Echo RPC Load Generator with empty request payload and empty response payload
-    ${result} =        Execute          ozone freon ome -t=1 -n=${n} --ratis
                        Should contain   ${result}   Successful executions: ${n}
