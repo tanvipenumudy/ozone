@@ -23,12 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
-import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -139,6 +134,30 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         normalizeKeyName(startKey), normalizeKeyName(keyPrefix), maxKeys);
     return l.stream().map(this::denormalizeOmKeyInfo)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public List<OmKeyInfoLight> listKeysLight(String volumeName, String bucketName,
+                                            String startKey, String keyPrefix,
+                                            int maxKeys) throws IOException {
+    // Call the existing listKeys method to get the list of OmKeyInfo
+    List<OmKeyInfo> keys = listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+
+    // Convert OmKeyInfo to OmKeyInfoLight
+    List<OmKeyInfoLight> result = new ArrayList<>();
+    for (OmKeyInfo key : keys) {
+      result.add(new OmKeyInfoLight(
+          key.getVolumeName(),
+          key.getBucketName(),
+          key.getKeyName(),
+          key.getDataSize(),
+          key.getCreationTime(),
+          key.getModificationTime(),
+          key.getReplicationConfig(),
+          key.isFile()
+      ));
+    }
+    return result;
   }
 
   @Override
