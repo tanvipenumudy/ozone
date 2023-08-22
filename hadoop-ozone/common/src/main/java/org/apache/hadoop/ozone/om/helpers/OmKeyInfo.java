@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -643,13 +644,19 @@ public final class OmKeyInfo extends WithParentObjectId
     KeyInfo.Builder kb = KeyInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setDataSize(dataSize)
-        .setType(replicationConfig.getReplicationType());
-    if (replicationConfig instanceof ECReplicationConfig) {
-      kb.setEcReplicationConfig(
-          ((ECReplicationConfig) replicationConfig).toProto());
+        .setDataSize(dataSize);
+
+    if (replicationConfig != null) {
+      kb.setType(replicationConfig.getReplicationType());
+      if (replicationConfig instanceof ECReplicationConfig) {
+        kb.setEcReplicationConfig(
+            ((ECReplicationConfig) replicationConfig).toProto());
+      } else {
+        kb.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+      }
     } else {
-      kb.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+      kb.setType(HddsProtos.ReplicationType.NONE);
+      kb.setFactor(HddsProtos.ReplicationFactor.ZERO);
     }
     kb.setLatestVersion(latestVersion)
         .addAllKeyLocationList(keyLocations)
