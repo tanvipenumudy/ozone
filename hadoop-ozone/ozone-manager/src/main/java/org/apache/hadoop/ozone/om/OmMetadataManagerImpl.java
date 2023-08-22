@@ -38,6 +38,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -1193,6 +1195,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
         keyTable.cacheIterator();
 
+    OmBucketInfo omBucketInfo =
+        getBucketTable().get(getBucketKey(volumeName, bucketName));
+    DefaultReplicationConfig bucketDefaultReplicationConfig =
+        omBucketInfo.getDefaultReplicationConfig();
+    ReplicationConfig bucketReplicationConfig =
+        bucketDefaultReplicationConfig != null ?
+            bucketDefaultReplicationConfig.getReplicationConfig() : null;
+
     //TODO: We can avoid this iteration if table cache has stored entries in
     // treemap. Currently HashMap is used in Cache. HashMap get operation is an
     // constant time operation, where as for treeMap get is log(n).
@@ -1212,6 +1222,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       if (omKeyInfo != null
           && key.startsWith(seekPrefix)
           && key.compareTo(seekKey) >= 0) {
+        if (omKeyInfo.getReplicationConfig().equals(bucketReplicationConfig)) {
+          omKeyInfo.setReplicationConfig(null);
+        }
         cacheKeyMap.put(key, omKeyInfo);
       }
     }

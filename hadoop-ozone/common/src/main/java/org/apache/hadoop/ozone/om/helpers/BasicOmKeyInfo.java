@@ -22,6 +22,7 @@ import java.util.Objects;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 
@@ -151,11 +152,16 @@ public class BasicOmKeyInfo {
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setType(replicationConfig.getReplicationType());
-    if (replicationConfig instanceof ECReplicationConfig) {
-      builder.setEcReplicationConfig(
-          ((ECReplicationConfig) replicationConfig).toProto());
+    if (replicationConfig != null) {
+      if (replicationConfig instanceof ECReplicationConfig) {
+        builder.setEcReplicationConfig(
+            ((ECReplicationConfig) replicationConfig).toProto());
+      } else {
+        builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+      }
     } else {
-      builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+      builder.setType(HddsProtos.ReplicationType.NONE);
+      builder.setFactor(HddsProtos.ReplicationFactor.ZERO);
     }
 
     return builder.build();
