@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
@@ -149,13 +150,15 @@ public class BasicOmKeyInfo {
         .setKeyName(keyName)
         .setDataSize(dataSize)
         .setCreationTime(creationTime)
-        .setModificationTime(modificationTime)
-        .setType(replicationConfig.getReplicationType());
-    if (replicationConfig instanceof ECReplicationConfig) {
-      builder.setEcReplicationConfig(
-          ((ECReplicationConfig) replicationConfig).toProto());
-    } else {
-      builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+        .setModificationTime(modificationTime);
+    if (replicationConfig != null) {
+      builder.setType(replicationConfig.getReplicationType());
+      if (replicationConfig instanceof ECReplicationConfig) {
+        builder.setEcReplicationConfig(
+            ((ECReplicationConfig) replicationConfig).toProto());
+      } else {
+        builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+      }
     }
 
     return builder.build();
@@ -217,6 +220,31 @@ public class BasicOmKeyInfo {
         omKeyInfo.getCreationTime(),
         omKeyInfo.getModificationTime(),
         omKeyInfo.getReplicationConfig(),
+        omKeyInfo.isFile());
+  }
+
+  public static BasicOmKeyInfo fromOmKeyInfoWithBucketConfig(
+      OmKeyInfo omKeyInfo,
+      DefaultReplicationConfig bucketDefaultReplicationConfig) {
+
+    ReplicationConfig keyReplicationConfig = omKeyInfo.getReplicationConfig();
+
+    ReplicationConfig bucketReplicationConfig =
+        bucketDefaultReplicationConfig != null ?
+            bucketDefaultReplicationConfig.getReplicationConfig() : null;
+
+    if (keyReplicationConfig.equals(bucketReplicationConfig)) {
+      keyReplicationConfig = null;
+    }
+
+    return new BasicOmKeyInfo(
+        omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(),
+        omKeyInfo.getDataSize(),
+        omKeyInfo.getCreationTime(),
+        omKeyInfo.getModificationTime(),
+        keyReplicationConfig,
         omKeyInfo.isFile());
   }
 }
