@@ -31,6 +31,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
  */
 public class BasicOmKeyInfo {
 
+  public static final long DEFAULT_CREATION_TIME_VALUE = Long.MIN_VALUE;
+  public static final long DEFAULT_MODIFICATION_TIME_VALUE = Long.MIN_VALUE;
+
   private String volumeName;
   private String bucketName;
   private String keyName;
@@ -148,9 +151,13 @@ public class BasicOmKeyInfo {
   public BasicKeyInfo getProtobuf() {
     BasicKeyInfo.Builder builder = BasicKeyInfo.newBuilder()
         .setKeyName(keyName)
-        .setDataSize(dataSize)
-        .setCreationTime(creationTime)
-        .setModificationTime(modificationTime);
+        .setDataSize(dataSize);
+    if (creationTime != DEFAULT_CREATION_TIME_VALUE) {
+      builder.setCreationTime(creationTime);
+    }
+    if (modificationTime != DEFAULT_MODIFICATION_TIME_VALUE) {
+      builder.setModificationTime(modificationTime);
+    }
     if (replicationConfig != null) {
       builder.setType(replicationConfig.getReplicationType());
       if (replicationConfig instanceof ECReplicationConfig) {
@@ -178,13 +185,29 @@ public class BasicOmKeyInfo {
         .setBucketName(request.getBucketName())
         .setKeyName(keyName)
         .setDataSize(basicKeyInfo.getDataSize())
-        .setCreationTime(basicKeyInfo.getCreationTime())
-        .setModificationTime(basicKeyInfo.getModificationTime())
-        .setReplicationConfig(ReplicationConfig.fromProto(
-            basicKeyInfo.getType(),
-            basicKeyInfo.getFactor(),
-            basicKeyInfo.getEcReplicationConfig()))
         .setIsFile(!keyName.endsWith("/"));
+
+    if (basicKeyInfo.hasCreationTime()) {
+      builder.setCreationTime(basicKeyInfo.getCreationTime());
+    } else {
+      builder.setCreationTime(DEFAULT_CREATION_TIME_VALUE);
+    }
+
+    if (basicKeyInfo.hasModificationTime()) {
+      builder.setModificationTime(basicKeyInfo.getModificationTime());
+    } else {
+      builder.setCreationTime(DEFAULT_MODIFICATION_TIME_VALUE);
+    }
+
+    if (basicKeyInfo.hasType() && basicKeyInfo.hasFactor() &&
+        basicKeyInfo.hasEcReplicationConfig()) {
+      builder.setReplicationConfig(ReplicationConfig.fromProto(
+          basicKeyInfo.getType(),
+          basicKeyInfo.getFactor(),
+          basicKeyInfo.getEcReplicationConfig()));
+    } else {
+      builder.setReplicationConfig(null);
+    }
 
     return builder.build();
   }
@@ -225,9 +248,12 @@ public class BasicOmKeyInfo {
 
   public static BasicOmKeyInfo fromOmKeyInfoWithBucketConfig(
       OmKeyInfo omKeyInfo,
-      DefaultReplicationConfig bucketDefaultReplicationConfig) {
+      DefaultReplicationConfig bucketDefaultReplicationConfig,
+      long bucketCreationTime, long bucketModificationTime) {
 
     ReplicationConfig keyReplicationConfig = omKeyInfo.getReplicationConfig();
+    long keyCreationTime = omKeyInfo.getCreationTime();
+    long keyModificationTime = omKeyInfo.getModificationTime();
 
     ReplicationConfig bucketReplicationConfig =
         bucketDefaultReplicationConfig != null ?
@@ -237,13 +263,21 @@ public class BasicOmKeyInfo {
       keyReplicationConfig = null;
     }
 
+    if (keyCreationTime == bucketCreationTime) {
+      keyCreationTime = DEFAULT_CREATION_TIME_VALUE;
+    }
+
+    if (keyModificationTime == bucketModificationTime) {
+      keyModificationTime = DEFAULT_MODIFICATION_TIME_VALUE;
+    }
+
     return new BasicOmKeyInfo(
         omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(),
         omKeyInfo.getKeyName(),
         omKeyInfo.getDataSize(),
-        omKeyInfo.getCreationTime(),
-        omKeyInfo.getModificationTime(),
+        keyCreationTime,
+        keyModificationTime,
         keyReplicationConfig,
         omKeyInfo.isFile());
   }

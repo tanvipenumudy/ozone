@@ -63,7 +63,6 @@ import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -2837,15 +2836,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            int maxKeys) throws IOException {
     OmBucketInfo omBucketInfo =
         bucketManager.getBucketInfo(volumeName, bucketName);
-    DefaultReplicationConfig bucketDefaultReplicationConfig =
-        omBucketInfo.getDefaultReplicationConfig();
 
     ListKeysResult listKeysResult =
         listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
     List<OmKeyInfo> keys = listKeysResult.getKeys();
     List<BasicOmKeyInfo> basicKeysList = keys.stream().map(
-        key -> fromOmKeyInfoWithBucketConfig(key,
-            bucketDefaultReplicationConfig)).collect(Collectors.toList());
+            key -> fromOmKeyInfoWithBucketConfig(key,
+                omBucketInfo.getDefaultReplicationConfig(),
+                omBucketInfo.getCreationTime(),
+                omBucketInfo.getModificationTime()))
+        .collect(Collectors.toList());
 
     return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }

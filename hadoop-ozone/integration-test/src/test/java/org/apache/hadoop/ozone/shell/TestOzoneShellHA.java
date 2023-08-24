@@ -1054,8 +1054,9 @@ public class TestOzoneShellHA {
     OzoneKeyDetails key =
         client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName).getKey(keyName);
-    assertEquals(HddsProtos.ReplicationType.EC,
-        key.getReplicationConfig().getReplicationType());
+    assertEquals(HddsProtos.ReplicationType.EC, key.getReplicationConfig(
+        client.getObjectStore().getVolume(volumeName).getBucket(bucketName)
+            .getReplicationConfig()).getReplicationType());
   }
 
   @Test

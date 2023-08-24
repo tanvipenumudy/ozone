@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.ozone.client;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.time.Instant;
@@ -31,6 +29,9 @@ import java.util.HashMap;
  * A class that encapsulates OzoneKey.
  */
 public class OzoneKey {
+
+  public static final long DEFAULT_CREATION_TIME_VALUE = Long.MIN_VALUE;
+  public static final long DEFAULT_MODIFICATION_TIME_VALUE = Long.MIN_VALUE;
 
   /**
    * Name of the Volume the Key belongs to.
@@ -140,12 +141,27 @@ public class OzoneKey {
     return creationTime;
   }
 
+  public Instant getCreationTime(Instant bucketCreationTime) {
+    if (creationTime == Instant.ofEpochMilli(DEFAULT_CREATION_TIME_VALUE)) {
+      return bucketCreationTime;
+    }
+    return creationTime;
+  }
+
   /**
    * Returns the modification time of the key.
    *
    * @return modification time
    */
   public Instant getModificationTime() {
+    return modificationTime;
+  }
+
+  public Instant getModificationTime(Instant bucketModificationTime) {
+    if (modificationTime ==
+        Instant.ofEpochMilli(DEFAULT_MODIFICATION_TIME_VALUE)) {
+      return bucketModificationTime;
+    }
     return modificationTime;
   }
 
@@ -157,25 +173,15 @@ public class OzoneKey {
     this.metadata.putAll(metadata);
   }
 
-  /**
-   * Returns the replication type of the key.
-   *
-   * @return replicationType
-   */
-  @Deprecated
-  @JsonIgnore
-  public ReplicationType getReplicationType() {
-    return ReplicationType
-            .fromProto(replicationConfig.getReplicationType());
-  }
-
-  @Deprecated
-  @JsonIgnore
-  public int getReplicationFactor() {
-    return replicationConfig.getRequiredNodes();
-  }
-
   public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
+  }
+
+  public ReplicationConfig getReplicationConfig(
+      ReplicationConfig bucketReplicationConfig) {
+    if (replicationConfig == null) {
+      return bucketReplicationConfig;
+    }
     return replicationConfig;
   }
 
