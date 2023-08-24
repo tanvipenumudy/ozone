@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -223,6 +224,31 @@ public class BasicOmKeyInfo {
         omKeyInfo.getCreationTime(),
         omKeyInfo.getModificationTime(),
         omKeyInfo.getReplicationConfig(),
+        omKeyInfo.isFile());
+  }
+
+  public static BasicOmKeyInfo fromOmKeyInfoWithBucketConfig(
+      OmKeyInfo omKeyInfo,
+      DefaultReplicationConfig bucketDefaultReplicationConfig) {
+
+    ReplicationConfig keyReplicationConfig = omKeyInfo.getReplicationConfig();
+
+    ReplicationConfig bucketReplicationConfig =
+        bucketDefaultReplicationConfig != null ?
+            bucketDefaultReplicationConfig.getReplicationConfig() : null;
+
+    if (keyReplicationConfig.equals(bucketReplicationConfig)) {
+      keyReplicationConfig = null;
+    }
+
+    return new BasicOmKeyInfo(
+        omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(),
+        omKeyInfo.getDataSize(),
+        omKeyInfo.getCreationTime(),
+        omKeyInfo.getModificationTime(),
+        keyReplicationConfig,
         omKeyInfo.isFile());
   }
 }

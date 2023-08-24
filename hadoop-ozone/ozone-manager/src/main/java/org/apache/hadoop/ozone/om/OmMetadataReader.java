@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import static org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo.fromOmKeyInfoWithBucketConfig;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 /**
@@ -349,12 +352,17 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                                             String bucketName,
                                             String startKey, String keyPrefix,
                                             int maxKeys) throws IOException {
+    OmBucketInfo omBucketInfo =
+        bucketManager.getBucketInfo(volumeName, bucketName);
+    DefaultReplicationConfig bucketDefaultReplicationConfig =
+        omBucketInfo.getDefaultReplicationConfig();
+
     ListKeysResult listKeysResult =
         listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
     List<OmKeyInfo> keys = listKeysResult.getKeys();
-    List<BasicOmKeyInfo> basicKeysList =
-        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
-            .collect(Collectors.toList());
+    List<BasicOmKeyInfo> basicKeysList = keys.stream().map(
+        key -> fromOmKeyInfoWithBucketConfig(key,
+            bucketDefaultReplicationConfig)).collect(Collectors.toList());
 
     return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
