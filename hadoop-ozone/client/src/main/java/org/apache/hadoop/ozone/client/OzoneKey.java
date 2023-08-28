@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import java.time.Instant;
@@ -171,6 +173,18 @@ public class OzoneKey {
 
   public void setMetadata(Map<String, String> metadata) {
     this.metadata.putAll(metadata);
+  }
+
+  @Deprecated
+  @JsonIgnore
+  public ReplicationType getReplicationType(
+      ReplicationConfig bucketReplicationConfig) {
+    if (replicationConfig == null) {
+      return ReplicationType
+          .fromProto(bucketReplicationConfig.getReplicationType());
+    }
+    return ReplicationType
+        .fromProto(replicationConfig.getReplicationType());
   }
 
   public ReplicationConfig getReplicationConfig() {

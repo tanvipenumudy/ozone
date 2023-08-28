@@ -299,9 +299,9 @@ public class TestObjectPut {
 
 
     //default type is set
-    Assert.assertEquals(ReplicationType.RATIS, key.getReplicationConfig(
+    Assert.assertEquals(ReplicationType.RATIS, key.getReplicationType(
         clientStub.getObjectStore().getS3Bucket(bucketName)
-            .getReplicationConfig()).getReplicationType());
+            .getReplicationConfig()));
   }
 
   @Test

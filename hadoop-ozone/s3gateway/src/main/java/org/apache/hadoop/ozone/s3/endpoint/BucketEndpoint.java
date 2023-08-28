@@ -702,9 +702,8 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setSize(next.getDataSize());
     keyMetadata.setETag("" + next.getModificationTime(
         getBucket(next.getBucketName()).getModificationTime()));
-    if (next.getReplicationConfig(
-            getBucket(next.getBucketName()).getReplicationConfig())
-        .getReplicationType().toString()
+    if (next.getReplicationType(
+            getBucket(next.getBucketName()).getReplicationConfig()).toString()
         .equals(ReplicationType.STAND_ALONE.toString())) {
       keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
     } else {
