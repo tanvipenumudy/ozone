@@ -26,18 +26,12 @@ import java.util.List;
  */
 public class ListKeysLightResult {
   private List<BasicOmKeyInfo> keys;
-  private boolean isTruncated;
 
-  public ListKeysLightResult(List<BasicOmKeyInfo> keys, boolean isTruncated) {
+  public ListKeysLightResult(List<BasicOmKeyInfo> keys) {
     this.keys = keys;
-    this.isTruncated = isTruncated;
   }
 
   public List<BasicOmKeyInfo> getKeys() {
     return keys;
-  }
-
-  public boolean isTruncated() {
-    return isTruncated;
   }
 }

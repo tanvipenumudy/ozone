@@ -691,7 +691,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OmKeyInfo key : listKeysResult.getKeys()) {
       resp.addKeyInfo(key.getProtobuf(true, clientVersion));
     }
-    resp.setIsTruncated(listKeysResult.isTruncated());
     return resp.build();
   }
 
@@ -709,7 +708,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (BasicOmKeyInfo key : listKeysLightResult.getKeys()) {
       resp.addBasicKeyInfo(key.getProtobuf());
     }
-    resp.setIsTruncated(listKeysLightResult.isTruncated());
     return resp.build();
   }
 

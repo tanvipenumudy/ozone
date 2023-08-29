@@ -1004,7 +1004,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       list.add(fromProtobuf);
     }
     keys.addAll(list);
-    return new ListKeysResult(keys, resp.getIsTruncated());
+    return new ListKeysResult(keys);
 
   }
 
@@ -1044,7 +1044,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           BasicOmKeyInfo.getFromProtobuf(basicKeyInfo, req);
       keys.add(fromProtobuf);
     }
-    return new ListKeysLightResult(keys, resp.getIsTruncated());
+    return new ListKeysLightResult(keys);
   }
 
   @Override

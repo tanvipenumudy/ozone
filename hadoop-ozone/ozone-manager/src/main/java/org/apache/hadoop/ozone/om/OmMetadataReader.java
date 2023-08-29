@@ -356,7 +356,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
             .collect(Collectors.toList());
 
-    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
+    return new ListKeysLightResult(basicKeysList);
   }
 
   /**

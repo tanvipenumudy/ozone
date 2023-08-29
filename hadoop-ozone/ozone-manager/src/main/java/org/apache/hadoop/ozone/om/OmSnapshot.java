@@ -143,7 +143,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         normalizeKeyName(startKey), normalizeKeyName(keyPrefix), maxKeys);
     return new ListKeysResult(
         listKeysResult.getKeys().stream().map(this::denormalizeOmKeyInfo)
-            .collect(Collectors.toList()), listKeysResult.isTruncated());
+            .collect(Collectors.toList()));
   }
 
   @Override
@@ -158,7 +158,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
         keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
             .collect(Collectors.toList());
 
-    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
+    return new ListKeysLightResult(basicKeysList);
   }
 
   @Override

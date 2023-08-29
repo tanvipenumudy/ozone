@@ -1158,7 +1158,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     List<OmKeyInfo> result = new ArrayList<>();
     if (maxKeys <= 0) {
-      return new ListKeysResult(result, false);
+      return new ListKeysResult(result);
     }
 
     if (Strings.isNullOrEmpty(volumeName)) {
@@ -1253,8 +1253,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-    boolean isTruncated = cacheKeyMap.size() > maxKeys;
-
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
     currentCount = 0;
@@ -1275,7 +1273,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Clear map and set.
     cacheKeyMap.clear();
 
-    return new ListKeysResult(result, isTruncated);
+    return new ListKeysResult(result);
   }
 
   // TODO: HDDS-2419 - Complete stub below for core logic
