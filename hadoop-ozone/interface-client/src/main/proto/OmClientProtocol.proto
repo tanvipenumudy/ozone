@@ -273,6 +273,7 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional ListKeysLightRequest             listKeysLightRequest           = 126;
 }
 
 message OMResponse {
@@ -1351,6 +1352,14 @@ message SecretKeyProto {
 }
 
 message ListKeysRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    optional string startKey = 3;
+    optional string prefix = 4;
+    optional int32 count = 5;
+}
+
+message ListKeysLightRequest {
     required string volumeName = 1;
     required string bucketName = 2;
     optional string startKey = 3;

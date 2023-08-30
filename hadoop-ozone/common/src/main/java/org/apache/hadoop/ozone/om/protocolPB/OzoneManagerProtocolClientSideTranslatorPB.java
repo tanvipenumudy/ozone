@@ -125,6 +125,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsRequest;
@@ -1014,7 +1015,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       String bucketName, String startKey, String prefix,
       int maxKeys) throws IOException {
     List<BasicOmKeyInfo> keys = new ArrayList<>();
-    ListKeysRequest.Builder reqBuilder = ListKeysRequest.newBuilder();
+    ListKeysLightRequest.Builder reqBuilder = ListKeysLightRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setBucketName(bucketName);
     reqBuilder.setCount(maxKeys);
@@ -1027,10 +1028,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       reqBuilder.setPrefix(prefix);
     }
 
-    ListKeysRequest req = reqBuilder.build();
+    ListKeysLightRequest req = reqBuilder.build();
 
     OMRequest omRequest = createOMRequest(Type.ListKeysLight)
-            .setListKeysRequest(req)
+            .setListKeysLightRequest(req)
             .build();
 
     ListKeysLightResponse resp =

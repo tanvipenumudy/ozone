@@ -98,6 +98,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
@@ -222,7 +223,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListKeysLight:
         ListKeysLightResponse listKeysLightResponse = listKeysLight(
-            request.getListKeysRequest());
+            request.getListKeysLightRequest());
         responseBuilder.setListKeysLightResponse(listKeysLightResponse);
         break;
       case ListTrash:
@@ -693,7 +694,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private ListKeysLightResponse listKeysLight(ListKeysRequest request)
+  private ListKeysLightResponse listKeysLight(ListKeysLightRequest request)
       throws IOException {
     ListKeysLightResponse.Builder resp =
         ListKeysLightResponse.newBuilder();
