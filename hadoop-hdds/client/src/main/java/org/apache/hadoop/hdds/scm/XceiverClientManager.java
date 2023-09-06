@@ -73,7 +73,8 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   private final CacheMetrics cacheMetrics;
   private List<X509Certificate> caCerts;
 
-  private static XceiverClientMetrics metrics;
+  private static final XceiverClientMetrics metrics =
+      XceiverClientMetrics.create();
   private boolean isSecurityEnabled;
   private final boolean topologyAwareRead;
   /**
@@ -288,20 +289,13 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
     }
     cacheMetrics.unregister();
-
-    if (metrics != null) {
-      metrics.unRegister();
-    }
+    metrics.unRegister();
   }
 
   /**
    * Get xceiver client metric.
    */
   public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
-    if (metrics == null) {
-      metrics = XceiverClientMetrics.create();
-    }
-
     return metrics;
   }
 
@@ -309,9 +303,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
    * Reset xceiver client metric.
    */
   public static synchronized void resetXceiverClientMetrics() {
-    if (metrics != null) {
       metrics.reset();
-    }
   }
 
   /**
