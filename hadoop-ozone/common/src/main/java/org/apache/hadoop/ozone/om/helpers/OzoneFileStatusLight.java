@@ -91,13 +91,13 @@ public class OzoneFileStatusLight {
   public OzoneFileStatusProtoLight getProtobuf() {
     OzoneFileStatusProtoLight.Builder builder =
         OzoneFileStatusProtoLight.newBuilder()
-            .setVolumeName(keyInfo.getVolumeName())
-            .setBucketName(keyInfo.getBucketName())
             .setBlockSize(blockSize)
             .setIsDirectory(isDirectory);
     //key info can be null for the fake root entry.
     if (keyInfo != null) {
-      builder.setBasicKeyInfo(keyInfo.getProtobuf());
+      builder.setBasicKeyInfo(keyInfo.getProtobuf())
+          .setVolumeName(keyInfo.getVolumeName())
+          .setBucketName(keyInfo.getBucketName());
     }
     return builder.build();
   }
