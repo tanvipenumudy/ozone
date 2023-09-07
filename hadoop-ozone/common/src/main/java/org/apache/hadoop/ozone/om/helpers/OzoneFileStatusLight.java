@@ -26,15 +26,10 @@ import java.util.Objects;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
- * File Status of the Ozone Key.
+ * Lightweight OzoneFileStatus class.
  */
 public class OzoneFileStatusLight {
 
-  private static final long serialVersionUID = 1L;
-
-  /**
-   * The key info object for files. Leave null for the root directory.
-   */
   private BasicOmKeyInfo keyInfo;
 
   private boolean isDirectory;
