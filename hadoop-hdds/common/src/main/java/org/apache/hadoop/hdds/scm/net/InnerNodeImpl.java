@@ -47,7 +47,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
   }
 
-  static final Factory FACTORY = new Factory();
+  public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep
   // the insert order
   private final HashMap<String, Node> childrenMap =

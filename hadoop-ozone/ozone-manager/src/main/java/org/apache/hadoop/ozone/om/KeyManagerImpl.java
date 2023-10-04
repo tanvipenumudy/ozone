@@ -50,6 +50,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.common.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -60,6 +62,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -152,6 +156,9 @@ public class KeyManagerImpl implements KeyManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyManagerImpl.class);
   public static final int DISABLE_VALUE = -1;
+
+  private static final AuditLogger AUDIT = new AuditLogger(
+      AuditLoggerType.OMLOGGER);
 
   /**
    * A SCM block client, used to talk to SCM to allocate block during putKey.
@@ -1789,23 +1796,39 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private List<DatanodeDetails> sortDatanodes(String clientMachine,
-      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
-    List<DatanodeDetails> sortedNodes = null;
-    try {
-      sortedNodes = scmClient.getBlockClient()
-          .sortDatanodes(nodeList, clientMachine);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
-            clientMachine, sortedNodes);
-      }
-    } catch (IOException e) {
-      LOG.warn("Unable to sort datanodes based on distance to client, "
-          + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
-          + " exception={}",
-          keyInfo.getVolumeName(), keyInfo.getBucketName(),
-          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
+                                              List<DatanodeDetails> nodes,
+                                              OmKeyInfo keyInfo,
+                                              List<String> nodeList) {
+    List<DatanodeDetails> sortedNodes = sortDatanodes(nodeList, clientMachine);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
+          clientMachine, sortedNodes);
     }
     return sortedNodes;
+  }
+
+  public List<DatanodeDetails> sortDatanodes(List<String> nodes,
+                                             String clientMachine) {
+    boolean auditSuccess = true;
+    NodeManager nodeManager = scm.getScmNodeManager();
+    Node client = null;
+    List<DatanodeDetails> possibleClients =
+        nodeManager.getNodesByAddress(clientMachine);
+    if (possibleClients.size() > 0) {
+      client = possibleClients.get(0);
+    }
+    List<Node> nodeList = new ArrayList();
+    nodes.stream().forEach(uuid -> {
+      DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
+      if (node != null) {
+        nodeList.add(node);
+      }
+    });
+    List<? extends Node> sortedNodeList = new NetworkTopology("")
+        .sortByDistanceCost(client, nodeList, nodes.size());
+    List<DatanodeDetails> ret = new ArrayList<>();
+    sortedNodeList.stream().forEach(node -> ret.add((DatanodeDetails) node));
+    return ret;
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
