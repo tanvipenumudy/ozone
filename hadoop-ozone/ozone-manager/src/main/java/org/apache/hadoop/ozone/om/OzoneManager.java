@@ -604,7 +604,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
     scmContainerClient = getScmContainerClient(configuration);
-    clusterMap = new NetworkTopologyImpl(refetchTopologyInformation());
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
     scmBlockLocationClient = new ScmBlockLocationClient(scmBlockClient);
@@ -612,6 +611,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
+    clusterMap = new NetworkTopologyImpl(refetchTopologyInformation());
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
