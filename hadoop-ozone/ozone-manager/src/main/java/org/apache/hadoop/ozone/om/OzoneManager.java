@@ -83,6 +83,8 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmBlockLocationClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -388,6 +390,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OMStorage omStorage;
   private final ScmBlockLocationProtocol scmBlockClient;
   private final StorageContainerLocationProtocol scmContainerClient;
+  private NetworkTopology clusterMap;
   private ObjectName omInfoBeanName;
   private Timer metricsTimer;
   private ScheduleOMMetricsWriteTask scheduleOMMetricsWriteTask;
@@ -601,6 +604,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
     scmContainerClient = getScmContainerClient(configuration);
+    clusterMap = new NetworkTopologyImpl(refetchTopologyInformation());
     // verifies that the SCM info in the OM Version file is correct.
     scmBlockClient = getScmBlockClient(configuration);
     scmBlockLocationClient = new ScmBlockLocationClient(scmBlockClient);
@@ -1145,6 +1149,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void setScmBlockLocationClient(
       ScmBlockLocationClient scmBlockLocationClient) {
     this.scmBlockLocationClient = scmBlockLocationClient;
+  }
+
+  public NetworkTopology getClusterMap() {
+    return clusterMap;
   }
 
   /**
