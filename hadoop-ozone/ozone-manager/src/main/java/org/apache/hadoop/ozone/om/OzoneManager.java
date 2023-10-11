@@ -611,8 +611,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
-    clusterMap = new NetworkTopologyImpl(
-        scmBlockLocationClient.getTopologyInformation());
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
@@ -1715,6 +1713,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Unable to initialize network topology schema file. ", ex);
       throw new UncheckedIOException(ex);
     }
+
+    clusterMap = new NetworkTopologyImpl(
+        scmBlockLocationClient.getTopologyInformation());
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);

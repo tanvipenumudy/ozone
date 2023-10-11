@@ -137,6 +137,7 @@ public class TestKeyManagerUnit {
   @Test
   public void listMultipartUploadPartsWithZeroUpload() throws IOException {
     //GIVEN
+    System.out.println(writeClient.refetchTopologyInformation());
     createBucket(metadataManager, "vol1", "bucket1");
 
     OmMultipartInfo omMultipartInfo =
