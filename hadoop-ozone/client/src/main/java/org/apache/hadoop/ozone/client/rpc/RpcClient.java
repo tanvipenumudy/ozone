@@ -1350,6 +1350,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OpenKeySession openKey(OmKeyArgs args) throws IOException {
+    return ozoneManagerClient.openKey(args);
+  }
+
+  @Override
+  public void commitKey(OmKeyArgs args, long clientID) throws IOException {
+    ozoneManagerClient.commitKey(args, clientID);
+  }
+
+  @Override
   public OzoneDataStreamOutput createStreamKey(
       String volumeName, String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig,
@@ -1644,6 +1654,26 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
     return getOzoneKeyDetails(keyInfo);
+  }
+
+  @Override
+  public OmKeyArgs getOmKeyArgs(
+      String bucketName, String keyName) throws IOException {
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        // Volume name is not important, as we call GetKeyInfo with
+        // assumeS3Context = true, OM will infer the correct s3 volume.
+        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setForceUpdateContainerCacheFromSCM(false)
+        .setHeadOp(false)
+        .build();
+    return keyArgs;
   }
 
   @NotNull

@@ -196,6 +196,11 @@ public final class OmKeyArgs implements Auditable {
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
   }
 
+  public static OmKeyArgs copyOmKeyArgsObject(OmKeyArgs keyArgs,
+                                              String newKeyName) {
+    return keyArgs.toBuilder().setKeyName(newKeyName).build();
+  }
+
   @NotNull
   public KeyArgs toProtobuf() {
     return KeyArgs.newBuilder()

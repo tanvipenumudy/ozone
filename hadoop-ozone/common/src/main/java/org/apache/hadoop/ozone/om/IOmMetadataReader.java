@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -157,6 +158,32 @@ public interface IOmMetadataReader {
                                      String startKey, String keyPrefix,
                                      int maxKeys)
       throws IOException;
+
+  /**
+   * Open the given key and return an open key session.
+   *
+   * @param args the args of the key.
+   * @return OpenKeySession instance that client uses to talk to container.
+   * @throws IOException
+   */
+  default OpenKeySession openKey(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented.");
+  }
+
+  /**
+   * Commit a key. This will make the change from the client visible. The client
+   * is identified by the clientID.
+   *
+   * @param args the key to commit
+   * @param clientID the client identification
+   * @throws IOException
+   */
+  default void commitKey(OmKeyArgs args, long clientID)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented.");
+  }
 
   /**
    * Returns list of ACLs for given Ozone object.

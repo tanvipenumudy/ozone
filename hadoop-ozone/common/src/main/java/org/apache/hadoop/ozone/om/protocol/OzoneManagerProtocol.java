@@ -228,33 +228,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
-  /**
-   * Open the given key and return an open key session.
-   *
-   * @param args the args of the key.
-   * @return OpenKeySession instance that client uses to talk to container.
-   * @throws IOException
-   */
-  default OpenKeySession openKey(OmKeyArgs args) throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented, as write requests use a new approach.");
-  }
-
-  /**
-   * Commit a key. This will make the change from the client visible. The client
-   * is identified by the clientID.
-   *
-   * @param args the key to commit
-   * @param clientID the client identification
-   * @throws IOException
-   */
-  default void commitKey(OmKeyArgs args, long clientID)
-      throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented, as write requests use a new approach.");
-  }
-
   /**
    * Synchronize the key length. This will make the change from the client
    * visible. The client is identified by the clientID.
