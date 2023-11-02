@@ -267,7 +267,7 @@ public class TestPermissionCheck {
     objectEndpoint.setOzoneConfiguration(conf);
 
     try {
-      objectEndpoint.get("bucketName", "keyPath", null, 1000, "marker");
+      objectEndpoint.get("bucketName", "keyPath", null, 1000, null);
       Assert.fail("Should fail");
     } catch (Exception e) {
       e.printStackTrace();
