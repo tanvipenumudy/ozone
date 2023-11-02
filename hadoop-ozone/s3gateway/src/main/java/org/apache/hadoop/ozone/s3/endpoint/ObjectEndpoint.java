@@ -63,7 +63,13 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -393,27 +399,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       OzoneKeyDetails keyDetails;
       if (partNumberMarker != null && !partNumberMarker.isEmpty()) {
-
-        int partMarker = parsePartNumberMarker(partNumberMarker);
-        OmKeyArgs keyArgs =
-            getClientProtocol().getOmKeyArgs(bucketName, keyPath);
-        OmKeyArgs keyArgsPartMarker = OmKeyArgs.copyOmKeyArgsObject(keyArgs,
-            keyArgs.getKeyName() + "_part_number_" + partMarker + "_temp");
-        OpenKeySession openKey = getClientProtocol().openKey(keyArgsPartMarker);
-        List<OmKeyLocationInfo> locationInfoListPartNumber =
-            openKey.getKeyInfo().getLatestVersionLocations()
-                .getBlocksLatestVersionOnly().stream()
-                .filter(x -> x.getPartNumber() == partMarker)
-                .collect(Collectors.toList());
-
-        keyArgsPartMarker.setLocationInfoList(locationInfoListPartNumber);
-        getClientProtocol().commitKey(keyArgsPartMarker, openKey.getId());
-
-        keyDetails = getClientProtocol().getS3KeyDetails(bucketName,
-            keyArgsPartMarker.getKeyName());
-        getClientProtocol().deleteKey(keyArgsPartMarker.getVolumeName(),
-            keyArgsPartMarker.getBucketName(), keyArgsPartMarker.getKeyName(),
-            true);
+        keyDetails = getDetails(bucketName, keyPath, partNumberMarker);
       } else {
         keyDetails =
             getClientProtocol().getS3KeyDetails(bucketName, keyPath);
@@ -541,6 +527,33 @@ public class ObjectEndpoint extends EndpointBase {
         );
       }
     }
+  }
+
+  private OzoneKeyDetails getDetails(String bucketName, String keyPath,
+                                             String partNumberMarker)
+      throws IOException {
+    OzoneKeyDetails keyDetails;
+    int partMarker = parsePartNumberMarker(partNumberMarker);
+    OmKeyArgs keyArgs =
+        getClientProtocol().getOmKeyArgs(bucketName, keyPath);
+    OmKeyArgs keyArgsPartMarker = OmKeyArgs.copyOmKeyArgsObject(keyArgs,
+        keyArgs.getKeyName() + "_part_number_" + partMarker + "_temp");
+    OpenKeySession openKey = getClientProtocol().openKey(keyArgsPartMarker);
+    List<OmKeyLocationInfo> locationInfoListPartNumber =
+        openKey.getKeyInfo().getLatestVersionLocations()
+            .getBlocksLatestVersionOnly().stream()
+            .filter(x -> x.getPartNumber() == partMarker)
+            .collect(Collectors.toList());
+
+    keyArgsPartMarker.setLocationInfoList(locationInfoListPartNumber);
+    getClientProtocol().commitKey(keyArgsPartMarker, openKey.getId());
+
+    keyDetails = getClientProtocol().getS3KeyDetails(bucketName,
+        keyArgsPartMarker.getKeyName());
+    getClientProtocol().deleteKey(keyArgsPartMarker.getVolumeName(),
+        keyArgsPartMarker.getBucketName(), keyArgsPartMarker.getKeyName(),
+        true);
+    return keyDetails;
   }
 
   static void addLastModifiedDate(
