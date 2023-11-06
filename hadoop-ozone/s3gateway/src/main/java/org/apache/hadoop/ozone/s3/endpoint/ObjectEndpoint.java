@@ -380,6 +380,7 @@ public class ObjectEndpoint extends EndpointBase {
   public Response get(
       @PathParam("bucket") String bucketName,
       @PathParam("path") String keyPath,
+      @QueryParam("partNumber") int partNumber,
       @QueryParam("uploadId") String uploadId,
       @QueryParam("max-parts") @DefaultValue("1000") int maxParts,
       @QueryParam("part-number-marker") String partNumberMarker)
@@ -398,8 +399,8 @@ public class ObjectEndpoint extends EndpointBase {
       }
 
       OzoneKeyDetails keyDetails;
-      if (partNumberMarker != null && !partNumberMarker.isEmpty()) {
-        keyDetails = getDetails(bucketName, keyPath, partNumberMarker);
+      if (partNumber != 0) {
+        keyDetails = getDetails(bucketName, keyPath, partNumber);
       } else {
         keyDetails =
             getClientProtocol().getS3KeyDetails(bucketName, keyPath);
@@ -530,19 +531,18 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   private OzoneKeyDetails getDetails(String bucketName, String keyPath,
-                                             String partNumberMarker)
+                                             int partNumber)
       throws IOException {
     OzoneKeyDetails keyDetails;
-    int partMarker = parsePartNumberMarker(partNumberMarker);
     OmKeyArgs keyArgs =
         getClientProtocol().getOmKeyArgs(bucketName, keyPath);
     OmKeyArgs keyArgsPartMarker = OmKeyArgs.copyOmKeyArgsObject(keyArgs,
-        keyArgs.getKeyName() + "_part_number_" + partMarker + "_temp");
+        keyArgs.getKeyName() + "_part_number_" + partNumber + "_temp");
     OpenKeySession openKey = getClientProtocol().openKey(keyArgsPartMarker);
     List<OmKeyLocationInfo> locationInfoListPartNumber =
         openKey.getKeyInfo().getLatestVersionLocations()
             .getBlocksLatestVersionOnly().stream()
-            .filter(x -> x.getPartNumber() == partMarker)
+            .filter(x -> x.getPartNumber() == partNumber)
             .collect(Collectors.toList());
 
     keyArgsPartMarker.setLocationInfoList(locationInfoListPartNumber);
