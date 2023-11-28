@@ -23,6 +23,10 @@ import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -36,6 +40,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -54,11 +59,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketSetPropertyResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CryptoProtocolVersionProto.ENCRYPTION_ZONES;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
@@ -84,10 +91,55 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
+    KeyProviderCryptoExtension kmsProvider =
+        ozoneManager.getKmsProvider();
+
+    BucketArgs.Builder bucketArgsBuilder =
+        setBucketPropertyRequestBuilder.getBucketArgsBuilder();
+
+    if (bucketArgsBuilder.hasBeinfo()) {
+      bucketArgsBuilder.setBeinfo(getBeinfo(kmsProvider,
+          getOmRequest().getSetBucketPropertyRequest().getBucketArgs()));
+    }
+
     return getOmRequest().toBuilder()
-        .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
+        .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder
+            .setBucketArgs(bucketArgsBuilder.build())
+            .build())
         .setUserInfo(getUserInfo())
         .build();
+  }
+
+  private BucketEncryptionInfoProto getBeinfo(
+      KeyProviderCryptoExtension kmsProvider, BucketArgs bucketArgs)
+      throws IOException {
+    BucketEncryptionInfoProto bek = bucketArgs.getBeinfo();
+    BucketEncryptionInfoProto.Builder bekb = null;
+    if (kmsProvider == null) {
+      throw new OMException("Invalid KMS provider, check configuration " +
+          CommonConfigurationKeys.HADOOP_SECURITY_KEY_PROVIDER_PATH,
+          OMException.ResultCodes.INVALID_KMS_PROVIDER);
+    }
+    if (bek.getKeyName() == null) {
+      throw new OMException("Bucket encryption key needed.", OMException
+          .ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
+    }
+    // Talk to KMS to retrieve the bucket encryption key info.
+    KeyProvider.Metadata metadata = kmsProvider.getMetadata(
+        bek.getKeyName());
+    if (metadata == null) {
+      throw new OMException("Bucket encryption key " + bek.getKeyName()
+          + " doesn't exist.",
+          OMException.ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
+    }
+    // If the provider supports pool for EDEKs, this will fill in the pool
+    kmsProvider.warmUpEncryptedKeys(bek.getKeyName());
+    bekb = BucketEncryptionInfoProto.newBuilder()
+        .setKeyName(bek.getKeyName())
+        .setCryptoProtocolVersion(ENCRYPTION_ZONES)
+        .setSuite(OMPBHelper.convert(
+            CipherSuite.convert(metadata.getCipher())));
+    return bekb.build();
   }
 
   @Override
