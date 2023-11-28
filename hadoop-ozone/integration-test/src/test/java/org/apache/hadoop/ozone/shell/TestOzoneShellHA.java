@@ -78,12 +78,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
@@ -1298,6 +1293,25 @@ public class TestOzoneShellHA {
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
       assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
+  }
+
+  @Test
+  public void testSetEncryptionKey() throws Exception {
+    final String volumeName = "volume110";
+    getVolume(volumeName);
+    String bucketPath = "/volume110/bucket0";
+    String[] args = new String[]{"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    assertNull(bucket.getEncryptionKeyName());
+    String newEncKey = "enckey1";
+    args = new String[]{"bucket", "set-encryption-key", bucketPath, "-k",
+        newEncKey};
+    execute(ozoneShell, args);
+    assertEquals(newEncKey, volume.getBucket("bucket0").getEncryptionKeyName());
   }
 
   @Test
