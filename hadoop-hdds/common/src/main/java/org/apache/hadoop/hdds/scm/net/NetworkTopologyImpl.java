@@ -70,6 +70,14 @@ public class NetworkTopologyImpl implements NetworkTopology {
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
   }
 
+  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
+    schemaManager = NodeSchemaManager.getInstance();
+    schemaManager.init(schemaFile);
+    maxLevel = schemaManager.getMaxLevel();
+    factory = InnerNodeImpl.FACTORY;
+    this.clusterTree = clusterTree;
+  }
+
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager) {
     schemaManager = manager;
@@ -566,6 +574,11 @@ public class NetworkTopologyImpl implements NetworkTopology {
     } finally {
       netlock.readLock().unlock();
     }
+  }
+
+  @Override
+  public InnerNode getClusterTree() {
+    return clusterTree;
   }
 
   @SuppressWarnings("java:S2245") // no need for secure random

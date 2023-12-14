@@ -20,10 +20,12 @@ package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This class is used to capture the current status of a datanode. This
@@ -33,19 +35,19 @@ import java.util.Set;
  */
 public class NodeStatus implements Comparable<NodeStatus> {
 
-  private static final Set<HddsProtos.NodeOperationalState>
+  private static Set<HddsProtos.NodeOperationalState>
       MAINTENANCE_STATES = ImmutableSet.copyOf(EnumSet.of(
           HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
           HddsProtos.NodeOperationalState.IN_MAINTENANCE
       ));
 
-  private static final Set<HddsProtos.NodeOperationalState>
+  private static Set<HddsProtos.NodeOperationalState>
       DECOMMISSION_STATES = ImmutableSet.copyOf(EnumSet.of(
           HddsProtos.NodeOperationalState.DECOMMISSIONING,
           HddsProtos.NodeOperationalState.DECOMMISSIONED
       ));
 
-  private static final Set<HddsProtos.NodeOperationalState>
+  private static Set<HddsProtos.NodeOperationalState>
       OUT_OF_SERVICE_STATES = ImmutableSet.copyOf(EnumSet.of(
           HddsProtos.NodeOperationalState.DECOMMISSIONING,
           HddsProtos.NodeOperationalState.DECOMMISSIONED,
@@ -82,6 +84,20 @@ public class NodeStatus implements Comparable<NodeStatus> {
     this.operationalState = operationalState;
     this.health = health;
     this.opStateExpiryEpochSeconds = opStateExpireEpocSeconds;
+  }
+
+  private NodeStatus(Set<HddsProtos.NodeOperationalState> MAINTENANCE_STATES,
+                     Set<HddsProtos.NodeOperationalState> DECOMMISSION_STATES,
+                     Set<HddsProtos.NodeOperationalState> OUT_OF_SERVICE_STATES,
+                     HddsProtos.NodeOperationalState operationalState,
+                     HddsProtos.NodeState health,
+                     long opStateExpiryEpochSeconds) {
+    this.MAINTENANCE_STATES = MAINTENANCE_STATES;
+    this.DECOMMISSION_STATES = DECOMMISSION_STATES;
+    this.OUT_OF_SERVICE_STATES = OUT_OF_SERVICE_STATES;
+    this.operationalState = operationalState;
+    this.health = health;
+    this.opStateExpiryEpochSeconds = opStateExpiryEpochSeconds;
   }
 
   public static NodeStatus inServiceHealthy() {
@@ -262,4 +278,36 @@ public class NodeStatus implements Comparable<NodeStatus> {
     return order;
   }
 
+  public ScmBlockLocationProtocolProtos.NodeStatus toProtobuf() {
+    ScmBlockLocationProtocolProtos.NodeStatus.Builder nodeStatus =
+        ScmBlockLocationProtocolProtos.NodeStatus.newBuilder()
+            .setOperationalState(operationalState)
+            .setHealth(health)
+            .setOpStateExpiryEpochSeconds(opStateExpiryEpochSeconds);
+
+    for (HddsProtos.NodeOperationalState maintenanceState : maintenanceStates()) {
+      nodeStatus.addMaintenanceStates(maintenanceState);
+    }
+
+    for (HddsProtos.NodeOperationalState decommissionState : decommissionStates()) {
+      nodeStatus.addDecommissionStates(decommissionState);
+    }
+
+    for (HddsProtos.NodeOperationalState outOfServiceState : outOfServiceStates()) {
+      nodeStatus.addOutOfServiceStates(outOfServiceState);
+    }
+    return nodeStatus.build();
+  }
+
+  public static NodeStatus fromProtobuf(
+      ScmBlockLocationProtocolProtos.NodeStatus nodeStatus) {
+    return new NodeStatus(nodeStatus.getMaintenanceStatesList().stream()
+        .collect(Collectors.toSet()),
+        nodeStatus.getDecommissionStatesList().stream()
+            .collect(Collectors.toSet()),
+        nodeStatus.getOutOfServiceStatesList().stream()
+            .collect(Collectors.toSet()),
+        nodeStatus.getOperationalState(), nodeStatus.getHealth(),
+        nodeStatus.getOpStateExpiryEpochSeconds());
+  }
 }

@@ -217,6 +217,8 @@ public interface NetworkTopology {
   Node getNode(int leafIndex, String scope, List<String> excludedScopes,
       Collection<Node> excludedNodes, Node affinityNode, int ancestorGen);
 
+  InnerNode getClusterTree();
+
   /** Return the distance cost between two nodes
    * The distance cost from one node to its parent is it's parent's cost
    * The distance cost between two nodes is calculated by summing up their

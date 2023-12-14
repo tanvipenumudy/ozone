@@ -17,16 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +31,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR;
  * A thread safe class that implements InnerNode interface.
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
+
   protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
     protected Factory() { }
 
@@ -48,9 +43,11 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   static final Factory FACTORY = new Factory();
+  private static Map<ScmBlockLocationProtocolProtos.InnerNode, InnerNode>
+      visitedNodesFromProtobuf = new HashMap<>();
   // a map of node's network name to Node for quick search and keep
   // the insert order
-  private final HashMap<String, Node> childrenMap =
+  private HashMap<String, Node> childrenMap =
       new LinkedHashMap<String, Node>();
   // number of descendant leaves under this node
   private int numOfLeaves;
@@ -64,6 +61,83 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   protected InnerNodeImpl(String name, String location, InnerNode parent,
       int level, int cost) {
     super(name, location, parent, level, cost);
+  }
+
+  protected InnerNodeImpl(String name, String location, int cost,
+                          HashMap<String, Node> childrenMap, int numOfLeaves) {
+    super(name, location, cost);
+    this.childrenMap = childrenMap;
+    this.numOfLeaves = numOfLeaves;
+  }
+
+  public static class Builder {
+    private String name;
+    private String location;
+    //private InnerNode parent;
+    //private int level;
+    private int cost;
+    private HashMap<String, Node> childrenMap = new LinkedHashMap<>();
+    private int numOfLeaves;
+    //private String path;
+
+    public Builder setName(String name) {
+      this.name = name;
+      return this;
+    }
+
+    public Builder setLocation(String location) {
+      this.location = location;
+      return this;
+    }
+
+//    public Builder setPath(String path) {
+//      this.path = path;
+//      return this;
+//    }
+
+//    public Builder setParent(InnerNode parent) {
+//      this.parent = parent;
+//      return this;
+//    }
+
+//    public Builder setLevel(int level) {
+//      this.level = level;
+//      return this;
+//    }
+
+    public Builder setCost(int cost) {
+      this.cost = cost;
+      return this;
+    }
+
+    public Builder setChildrenMap(HashMap<String, Node> childrenMap) {
+      this.childrenMap = childrenMap;
+      return this;
+    }
+
+    public Builder setChildrenMap(
+        List<ScmBlockLocationProtocolProtos.ChildrenMap> childrenMapList) {
+      HashMap<String, Node> newChildrenMap = new HashMap<>();
+      for (ScmBlockLocationProtocolProtos.ChildrenMap childrenMapProto :
+          childrenMapList) {
+        String networkName = childrenMapProto.getNetworkName();
+        ScmBlockLocationProtocolProtos.NodeType nodeType =
+            childrenMapProto.getNodeType();
+        Node node = Node.fromProtobuf(nodeType);
+        newChildrenMap.put(networkName, node);
+      }
+      this.childrenMap = newChildrenMap;
+      return this;
+    }
+
+    public Builder setNumOfLeaves(int numOfLeaves) {
+      this.numOfLeaves = numOfLeaves;
+      return this;
+    }
+
+    public InnerNodeImpl build() {
+      return new InnerNodeImpl(name, location, cost, childrenMap, numOfLeaves);
+    }
   }
 
   /** @return the number of children this node has */
@@ -390,6 +464,72 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
   }
 
   @Override
+  public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
+
+//    if (getVisitedNodesToProtobuf().containsKey(this)) {
+//      return getVisitedNodesToProtobuf().get(this);
+//    }
+
+    ScmBlockLocationProtocolProtos.InnerNode.Builder innerNode =
+        ScmBlockLocationProtocolProtos.InnerNode.newBuilder()
+            .setNumOfLeaves(numOfLeaves)
+            .setNodeImpl(
+                NodeImpl.toProtobuf(getNetworkName(), getNetworkLocation(),
+                    getCost()));
+
+    if (childrenMap != null || !childrenMap.isEmpty()) {
+      for (Map.Entry<String, Node> entry : childrenMap.entrySet()) {
+        if (entry.getValue() != null) {
+          ScmBlockLocationProtocolProtos.ChildrenMap childrenMapProto =
+              ScmBlockLocationProtocolProtos.ChildrenMap.newBuilder()
+                  .setNetworkName(entry.getKey())
+                  .setNodeType(entry.getValue().toProtobuf(clientVersion))
+                  .build();
+          innerNode.addChildrenMap(childrenMapProto);
+        }
+      }
+    }
+    innerNode.build();
+
+    ScmBlockLocationProtocolProtos.NodeType nodeType =
+        ScmBlockLocationProtocolProtos.NodeType.newBuilder()
+            .setInnerNode(innerNode).build();
+
+//    getVisitedNodesToProtobuf().put(this, nodeType);
+    return nodeType;
+  }
+
+  public static Node fromProtobuf(
+      ScmBlockLocationProtocolProtos.NodeType nodeType) {
+    return nodeType.hasInnerNode()
+        ? InnerNodeImpl.fromProtobuf(nodeType.getInnerNode())
+        : null;
+  }
+
+  public static InnerNode fromProtobuf(
+      ScmBlockLocationProtocolProtos.InnerNode innerNode) {
+
+    if (visitedNodesFromProtobuf.containsKey(innerNode)) {
+      return visitedNodesFromProtobuf.get(innerNode);
+    }
+
+    ScmBlockLocationProtocolProtos.NodeImpl nodeImpl = innerNode.getNodeImpl();
+    InnerNodeImpl.Builder builder = new InnerNodeImpl.Builder()
+        .setName(nodeImpl.getName())
+        .setLocation(nodeImpl.getLocation())
+//        .setParent(nodeImpl.hasParent() == false ? null :
+//            InnerNode.fromProtobuf(nodeImpl.getParent()))
+        .setCost(nodeImpl.getCost())
+//        .setLevel(nodeImpl.getLevel())
+        .setChildrenMap(innerNode.getChildrenMapList())
+        .setNumOfLeaves(innerNode.getNumOfLeaves());
+
+    InnerNode res = builder.build();
+    visitedNodesFromProtobuf.put(innerNode, res);
+    return res;
+  }
+
+  @Override
   public boolean equals(Object to) {
     if (to == null) {
       return false;
@@ -540,4 +680,41 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
     return nodeCounts;
   }
+
+//  @Override
+//  public boolean equals(Object o) {
+//    if (this == o) {
+//      return true;
+//    }
+//    if (o == null || getClass() != o.getClass()) {
+//      return false;
+//    }
+//
+//    InnerNodeImpl innerNodeImpl = (InnerNodeImpl) o;
+//
+//    LOG.info("Expected:   getNetworkName()=" + getNetworkName() + "   Actual: innerNodeImpl.getNetworkName()=" + innerNodeImpl.getNetworkName());
+//    LOG.info("Expected:   getNetworkLocation()=" + getNetworkLocation() + "   Actual: innerNodeImpl.getNetworkLocation()=" + innerNodeImpl.getNetworkLocation());
+//    LOG.info("Expected:   getNetworkFullPath()=" + getNetworkFullPath() + "   Actual: innerNodeImpl.getNetworkFullPath()=" + innerNodeImpl.getNetworkFullPath());
+//    LOG.info("Expected:   getParent()=" + getParent() + "   Actual: innerNodeImpl.getParent()=" + innerNodeImpl.getParent());
+//    LOG.info("Expected:   getLevel()=" + getLevel() + "   Actual: innerNodeImpl.getLevel()=" + innerNodeImpl.getLevel());
+//    LOG.info("Expected:   getCost()=" + getCost() + "   Actual: innerNodeImpl.getCost()=" + innerNodeImpl.getCost());
+//    LOG.info("Expected:   numOfLeaves=" + numOfLeaves + "   Actual: numOfLeaves=" + innerNodeImpl.numOfLeaves);
+//    LOG.info("Expected:   childrenMap=" + childrenMap + "   Actual: childrenMap=" + innerNodeImpl.childrenMap);
+//    LOG.info("Expected:   childrenMapSize=" + childrenMap.size() + "   Actual: childrenMapSize=" + innerNodeImpl.childrenMap.size());
+//
+//    return childrenMap.equals(innerNodeImpl.childrenMap) &&
+//        numOfLeaves == innerNodeImpl.numOfLeaves &&
+//        getNetworkName().equals(innerNodeImpl.getNetworkName()) &&
+//        getNetworkLocation().equals(innerNodeImpl.getNetworkLocation()) &&
+//        getNetworkFullPath().equals(innerNodeImpl.getNetworkFullPath()) &&
+//        getParent().equals(innerNodeImpl.getParent()) &&
+//        getLevel() == innerNodeImpl.getLevel() &&
+//        getCost() == innerNodeImpl.getCost();
+//  }
+//
+//  @Override
+//  public int hashCode() {
+//    return Objects.hash(getNetworkName(), getNetworkLocation(),
+//        getNetworkFullPath(), getLevel());
+//  }
 }

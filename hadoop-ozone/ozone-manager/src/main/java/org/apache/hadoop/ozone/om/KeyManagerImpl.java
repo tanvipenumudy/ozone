@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -1832,8 +1833,7 @@ public class KeyManagerImpl implements KeyManager {
               LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
-                uuidList);
+            sortedNodes = sortDatanodes(clientMachine, nodes);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
@@ -1865,6 +1865,32 @@ public class KeyManagerImpl implements KeyManager {
           keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
     }
     return sortedNodes;
+  }
+
+  public List<DatanodeDetails> sortDatanodes(String clientMachine,
+                                             List<DatanodeDetails> nodes) {
+    DatanodeDetails client = null;
+    List<DatanodeDetails> possibleClients =
+        getClientNodesByAddress(clientMachine, nodes);
+    if (possibleClients.size() > 0) {
+      client = possibleClients.get(0);
+    }
+    List<? extends Node> sortedNodeList = ozoneManager.getClusterMap()
+        .sortByDistanceCost(client, nodes, nodes.size());
+    List<DatanodeDetails> ret = new ArrayList<>();
+    sortedNodeList.stream().forEach(node -> ret.add((DatanodeDetails) node));
+    return ret;
+  }
+
+  private List<DatanodeDetails> getClientNodesByAddress(String clientMachine,
+      List<DatanodeDetails> nodes) {
+    List<DatanodeDetails> matchingNodes = new ArrayList<>();
+    for (DatanodeDetails node : nodes) {
+      if (node.getIpAddress().equals(clientMachine)) {
+        matchingNodes.add(node);
+      }
+    }
+    return matchingNodes;
   }
 
   private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
