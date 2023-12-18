@@ -42,7 +42,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
     }
   }
 
-  static final Factory FACTORY = new Factory();
+  public static final Factory FACTORY = new Factory();
   private static Map<ScmBlockLocationProtocolProtos.InnerNode, InnerNode>
       visitedNodesFromProtobuf = new HashMap<>();
   // a map of node's network name to Node for quick search and keep

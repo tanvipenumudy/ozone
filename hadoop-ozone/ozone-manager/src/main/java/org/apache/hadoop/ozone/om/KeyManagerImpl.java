@@ -1847,25 +1847,25 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  private List<DatanodeDetails> sortDatanodes(String clientMachine,
-      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
-    List<DatanodeDetails> sortedNodes = null;
-    try {
-      sortedNodes = scmClient.getBlockClient()
-          .sortDatanodes(nodeList, clientMachine);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
-            clientMachine, sortedNodes);
-      }
-    } catch (IOException e) {
-      LOG.warn("Unable to sort datanodes based on distance to client, "
-          + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
-          + " exception={}",
-          keyInfo.getVolumeName(), keyInfo.getBucketName(),
-          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
-    }
-    return sortedNodes;
-  }
+//  private List<DatanodeDetails> sortDatanodes(String clientMachine,
+//      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
+//    List<DatanodeDetails> sortedNodes = null;
+//    try {
+//      sortedNodes = scmClient.getBlockClient()
+//          .sortDatanodes(nodeList, clientMachine);
+//      if (LOG.isDebugEnabled()) {
+//        LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes,
+//            clientMachine, sortedNodes);
+//      }
+//    } catch (IOException e) {
+//      LOG.warn("Unable to sort datanodes based on distance to client, "
+//          + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
+//          + " exception={}",
+//          keyInfo.getVolumeName(), keyInfo.getBucketName(),
+//          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
+//    }
+//    return sortedNodes;
+//  }
 
   public List<DatanodeDetails> sortDatanodes(String clientMachine,
                                              List<DatanodeDetails> nodes) {
