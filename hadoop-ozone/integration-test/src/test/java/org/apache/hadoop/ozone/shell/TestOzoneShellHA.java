@@ -83,6 +83,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.Assert;
@@ -1298,6 +1299,25 @@ public class TestOzoneShellHA {
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
       assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
+  }
+
+  @Test
+  public void testSetEncryptionKey() throws Exception {
+    final String volumeName = "volume110";
+    getVolume(volumeName);
+    String bucketPath = "/volume110/bucket0";
+    String[] args = new String[]{"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    OzoneVolume volume =
+        client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket("bucket0");
+    assertNull(bucket.getEncryptionKeyName());
+    String newEncKey = "enckey1";
+    args = new String[]{"bucket", "set-encryption-key", bucketPath, "-k",
+        newEncKey};
+    execute(ozoneShell, args);
+    assertEquals(newEncKey, volume.getBucket("bucket0").getEncryptionKeyName());
   }
 
   @Test
