@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
+import org.junit.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -145,6 +146,37 @@ public class TestOmBucketReadWriteKeyOps {
               .setTotalThreadCount(20).setNumOfReadOperations(0)
               .setNumOfWriteOperations(5).setKeyCountForRead(0)
               .setKeyCountForWrite(5));
+
+    } finally {
+      shutdown();
+    }
+  }
+
+  @Test
+  public void testAllocateBlock() throws Exception {
+    try {
+      startCluster(false);
+      FileOutputStream out = FileUtils.openOutputStream(new File(path,
+          "conf"));
+      cluster.getConf().writeXml(out);
+      out.getFD().sync();
+      out.close();
+
+      store.createVolume("vol1");
+      OzoneVolume volume = store.getVolume("vol1");
+      volume.createBucket("buck1");
+      OzoneBucket bucket = volume.getBucket("buck1");
+      String confPath = new File(path, "conf").getAbsolutePath();
+
+      long startTime = System.currentTimeMillis();
+      new Freon().execute(
+          new String[]{"-conf", confPath, "ockrw",
+              "-v", "vol1",
+              "-b", "buck1",
+              "--size", "0",
+              "-n", String.valueOf(5000)});
+      long totalTime = System.currentTimeMillis() - startTime;
+      LOG.info("Total Execution Time: " + totalTime);
 
     } finally {
       shutdown();

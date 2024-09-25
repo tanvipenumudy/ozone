@@ -23,22 +23,18 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.ContainerBlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.*;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -72,7 +68,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -90,6 +85,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -201,7 +197,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
+    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
+  /*
     try {
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
@@ -214,7 +211,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
       throw ex;
-    }
+    }*/
+
+    AllocatedBlock allocatedBlockDummy = AllocatedBlock.newBuilder()
+        .setPipeline(createRatisPipeline())
+        .setContainerBlockID(new ContainerBlockID())
+        .build();
+    allocatedBlocks.add(allocatedBlockDummy);
+
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
@@ -229,6 +233,60 @@ public abstract class OMKeyRequest extends OMClientRequest {
       locationInfos.add(builder.build());
     }
     return locationInfos;
+  }
+
+  public static Pipeline createRatisPipeline() {
+
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(randomDatanodeDetails());
+    nodes.add(randomDatanodeDetails());
+    nodes.add(randomDatanodeDetails());
+
+    return Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .setLeaderId(UUID.randomUUID())
+        .build();
+  }
+
+  public static DatanodeDetails randomDatanodeDetails() {
+    return createDatanodeDetails(UUID.randomUUID());
+  }
+
+  public static DatanodeDetails createDatanodeDetails(UUID uuid) {
+    Random random = ThreadLocalRandom.current();
+    String ipAddress = random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256);
+    return createDatanodeDetails(uuid.toString(), "localhost" + "-" + ipAddress,
+        ipAddress, null);
+  }
+
+  public static DatanodeDetails createDatanodeDetails(String uuid,
+                                                      String hostname, String ipAddress, String networkLocation) {
+    return createDatanodeDetails(uuid, hostname, ipAddress, networkLocation, 0);
+  }
+
+  public static DatanodeDetails createDatanodeDetails(String uuid,
+                                                      String hostname, String ipAddress, String networkLocation, int port) {
+
+    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
+        .setUuid(UUID.fromString(uuid))
+        .setHostName(hostname)
+        .setIpAddress(ipAddress)
+        .setNetworkLocation(networkLocation)
+        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+        .setPersistedOpStateExpiry(0);
+
+    for (DatanodeDetails.Port.Name name : ALL_PORTS) {
+      dn.addPort(DatanodeDetails.newPort(name, port));
+    }
+
+    return dn.build();
   }
 
   /* Optimize ugi lookup for RPC operations to avoid a trip through

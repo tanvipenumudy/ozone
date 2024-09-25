@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.Objects;
+import java.util.Random;
 
 /**
  * BlockID returned by SCM during allocation of block (containerID + localID).
@@ -27,10 +28,16 @@ import java.util.Objects;
 public class ContainerBlockID {
   private final long containerID;
   private final long localID;
+  private Random rand = new Random();
 
   public ContainerBlockID(long containerID, long localID) {
     this.containerID = containerID;
     this.localID = localID;
+  }
+
+  public ContainerBlockID() {
+    this.containerID = rand.nextLong();
+    this.localID = rand.nextLong();
   }
 
   public long getContainerID() {
