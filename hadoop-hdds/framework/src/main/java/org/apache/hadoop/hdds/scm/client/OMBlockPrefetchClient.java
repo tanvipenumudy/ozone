@@ -112,10 +112,16 @@ public class OMBlockPrefetchClient {
         blockQueue.addAll(replicatedBlocks);
     }
 
-    private List<AllocatedBlock> allocateBlocksWithReplication(
+    private List<AllocatedBlock> allocateBlocksWithReplicationForce(
             ReplicationConfig replicationConfig, int blockCount) throws IOException {
         return scmBlockLocationProtocol.allocateBlock(
                 scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "", true);
+    }
+
+    private List<AllocatedBlock> allocateBlocksWithReplication(
+            ReplicationConfig replicationConfig, int blockCount) throws IOException {
+        return scmBlockLocationProtocol.allocateBlock(
+                scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "");
     }
 
     private void scheduleBlockValidationAndFetch(ConfigurationSource conf,
@@ -172,8 +178,7 @@ public class OMBlockPrefetchClient {
     }
 
     private boolean isBlockValid(AllocatedBlock block) {
-
-
+        return true;
     }
 
     public synchronized AllocatedBlock getBlock() {
