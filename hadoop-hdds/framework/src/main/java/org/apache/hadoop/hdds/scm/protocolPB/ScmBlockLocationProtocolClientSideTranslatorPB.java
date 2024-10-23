@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestForceProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
@@ -216,6 +217,74 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
           .setContainerBlockID(
               ContainerBlockID.getFromProtobuf(resp.getContainerBlockID()))
           .setPipeline(Pipeline.getFromProtobuf(resp.getPipeline()));
+      blocks.add(builder.build());
+    }
+
+    return blocks;
+  }
+
+  @Override
+  public List<AllocatedBlock> allocateBlock(
+          long size, int num,
+          ReplicationConfig replicationConfig,
+          String owner, ExcludeList excludeList,
+          String clientMachine, boolean forceContainerCreate) throws IOException {
+    Preconditions.checkArgument(size > 0, "block size must be greater than 0");
+
+    final AllocateScmBlockRequestForceProto.Builder requestBuilder =
+            AllocateScmBlockRequestForceProto.newBuilder()
+                    .setSize(size)
+                    .setNumBlocks(num)
+                    .setType(replicationConfig.getReplicationType())
+                    .setOwner(owner)
+                    .setForceContainerCreate(forceContainerCreate)
+                    .setExcludeList(excludeList.getProtoBuf());
+
+    if (StringUtils.isNotEmpty(clientMachine)) {
+      requestBuilder.setClient(clientMachine);
+    }
+
+    switch (replicationConfig.getReplicationType()) {
+      case STAND_ALONE:
+        requestBuilder.setFactor(
+                ((StandaloneReplicationConfig) replicationConfig)
+                        .getReplicationFactor());
+        break;
+      case RATIS:
+        requestBuilder.setFactor(
+                ((RatisReplicationConfig) replicationConfig).getReplicationFactor());
+        break;
+      case EC:
+        // We do not check for server support here, as this call is used only
+        // from OM which has the same software version as SCM.
+        // TODO: Rolling upgrade support needs to change this.
+        requestBuilder.setEcReplicationConfig(
+                ((ECReplicationConfig)replicationConfig).toProto());
+        break;
+      default:
+        throw new IllegalArgumentException(
+                "Unsupported replication type " + replicationConfig
+                        .getReplicationType());
+    }
+
+    AllocateScmBlockRequestForceProto request = requestBuilder.build();
+
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(
+            Type.AllocateScmBlockForce)
+            .setAllocateScmBlockRequestForce(request)
+            .build();
+
+    final SCMBlockLocationResponse wrappedResponse =
+            handleError(submitRequest(wrapper));
+    final AllocateScmBlockResponseProto response =
+            wrappedResponse.getAllocateScmBlockResponse();
+
+    List<AllocatedBlock> blocks = new ArrayList<>(response.getBlocksCount());
+    for (AllocateBlockResponse resp : response.getBlocksList()) {
+      AllocatedBlock.Builder builder = new AllocatedBlock.Builder()
+              .setContainerBlockID(
+                      ContainerBlockID.getFromProtobuf(resp.getContainerBlockID()))
+              .setPipeline(Pipeline.getFromProtobuf(resp.getPipeline()));
       blocks.add(builder.build());
     }
 

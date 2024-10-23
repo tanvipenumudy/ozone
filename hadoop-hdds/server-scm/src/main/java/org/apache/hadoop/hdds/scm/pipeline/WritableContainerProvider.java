@@ -55,4 +55,7 @@ public interface WritableContainerProvider<T extends ReplicationConfig> {
       String owner, ExcludeList excludeList)
       throws IOException;
 
+  ContainerInfo getContainer(long size, T repConfig,
+       String owner, ExcludeList excludeList, boolean forceContainerCreate) throws IOException;
+
 }

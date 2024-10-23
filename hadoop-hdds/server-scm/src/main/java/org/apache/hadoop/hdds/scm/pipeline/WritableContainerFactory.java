@@ -81,6 +81,24 @@ public class WritableContainerFactory {
     }
   }
 
+    public ContainerInfo getContainer(final long size,
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList, boolean forceContainerCreate)
+      throws IOException {
+    switch (repConfig.getReplicationType()) {
+    case STAND_ALONE:
+      return standaloneProvider
+          .getContainer(size, repConfig, owner, excludeList);
+    case RATIS:
+      return ratisProvider.getContainer(size, repConfig, owner, excludeList, forceContainerCreate);
+    case EC:
+      return ecProvider.getContainer(size, (ECReplicationConfig)repConfig,
+          owner, excludeList, forceContainerCreate);
+    default:
+      throw new IOException(repConfig.getReplicationType()
+          + " is an invalid replication type");
+    }
+  }
+
   private long getConfiguredContainerSize(ConfigurationSource conf) {
     return (long) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);

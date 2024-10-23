@@ -137,6 +137,22 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
     return Collections.singletonList(abb.build());
   }
 
+    @Override
+  public List<AllocatedBlock> allocateBlock(long size, int num,
+      ReplicationConfig config,
+      String owner, ExcludeList excludeList, String clientMachine, boolean forceContainerCreate)
+      throws IOException {
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    Pipeline pipeline = createPipeline(datanodeDetails);
+    long containerID = Time.monotonicNow();
+    long localID = Time.monotonicNow();
+    AllocatedBlock.Builder abb =
+        new AllocatedBlock.Builder()
+            .setContainerBlockID(new ContainerBlockID(containerID, localID))
+            .setPipeline(pipeline);
+    return Collections.singletonList(abb.build());
+  }
+
   private Pipeline createPipeline(DatanodeDetails datanode) {
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(datanode);

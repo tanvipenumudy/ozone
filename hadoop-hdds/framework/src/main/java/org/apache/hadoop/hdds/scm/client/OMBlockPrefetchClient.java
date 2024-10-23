@@ -1,6 +1,7 @@
 package org.apache.hadoop.hdds.scm.client;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -37,7 +38,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 public class OMBlockPrefetchClient {
     private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
     private final ScmBlockLocationProtocol scmBlockLocationProtocol;
-    private final LinkedList<AllocatedBlock> blockQueue = new LinkedList<>();
+    private final LinkedList<AllocatedBlock> blockQueueRatisOne = new LinkedList<>();
+    private final LinkedList<AllocatedBlock> blockQueueRatisThree = new LinkedList<>();
+    private final LinkedList<AllocatedBlock> blockQueueRS_3_2 = new LinkedList<>();
+    private final LinkedList<AllocatedBlock> blockQueueRS_6_3 = new LinkedList<>();
+    private final LinkedList<AllocatedBlock> blockQueueXOR_10_4 = new LinkedList<>();
+
     private ScheduledExecutorService executorService;
     private int maxBlocks, minBlocks;
     private boolean grpcBlockTokenEnabled;
@@ -51,6 +57,18 @@ public class OMBlockPrefetchClient {
     private static final ReplicationConfig RATIS_ONE =
             ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE);
+    private static final ReplicationConfig RS_3_2_1024 = ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null, OMBlockPrefetchClient.toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024));
+    private static final ReplicationConfig RS_6_3_1024 = ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null, OMBlockPrefetchClient.toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024));
+    private static final ReplicationConfig XOR_10_4_4096 = ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null, OMBlockPrefetchClient.toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096));
+
+    public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec, int ecChunkSize) {
+        return HddsProtos.ECReplicationConfig.newBuilder()
+                .setData(data)
+                .setParity(parity)
+                .setCodec(codec.toString())
+                .setEcChunkSize(ecChunkSize)
+                .build();
+    }
 
     public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockLocationProtocol, String serviceID) {
         this.scmBlockLocationProtocol = scmBlockLocationProtocol;
@@ -64,7 +82,11 @@ public class OMBlockPrefetchClient {
         this.preallocateBlocksMax = conf.getInt(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
         this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
                 OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-        prefetchBlocks(maxBlocks);
+        prefetchBlocks(maxBlocks, RATIS_THREE, blockQueueRatisThree);
+        prefetchBlocks(maxBlocks, RATIS_ONE, blockQueueRatisOne);
+        prefetchBlocks(maxBlocks, RS_3_2_1024, blockQueueRS_3_2);
+        prefetchBlocks(maxBlocks, RS_6_3_1024, blockQueueRS_6_3);
+        prefetchBlocks(maxBlocks, XOR_10_4_4096, blockQueueXOR_10_4);
         scheduleBlockValidationAndFetch(conf, Instant.now());
     }
 
@@ -83,20 +105,17 @@ public class OMBlockPrefetchClient {
         }
     }
 
-    private synchronized void prefetchBlocks(int numBlocks) throws IOException {
+    private synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
+                                             LinkedList<AllocatedBlock> blockQueue) throws IOException {
         LOG.info("Prefetching {} AllocatedBlocks from SCM", numBlocks);
-
-        List<AllocatedBlock> ratisThreeReplicatedBlocks = allocateBlocksWithReplication(RATIS_THREE, numBlocks / 2);
-        List<AllocatedBlock> ratisOneReplicatedBlocks = allocateBlocksWithReplication(RATIS_ONE, numBlocks / 2);
-
-        blockQueue.addAll(ratisThreeReplicatedBlocks);
-        blockQueue.addAll(ratisOneReplicatedBlocks);
+        List<AllocatedBlock> replicatedBlocks = allocateBlocksWithReplication(replicationConfig, numBlocks);
+        blockQueue.addAll(replicatedBlocks);
     }
 
     private List<AllocatedBlock> allocateBlocksWithReplication(
             ReplicationConfig replicationConfig, int blockCount) throws IOException {
         return scmBlockLocationProtocol.allocateBlock(
-                scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "");
+                scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "", true);
     }
 
     private void scheduleBlockValidationAndFetch(ConfigurationSource conf,
@@ -128,7 +147,15 @@ public class OMBlockPrefetchClient {
 
     private synchronized void validateAndRefillBlocks(ConfigurationSource conf) throws IOException {
         LOG.info("Validating cached allocated blocks...");
+        validateAndRefillBlocksUtil(blockQueueRatisOne, RATIS_ONE, conf);
+        validateAndRefillBlocksUtil(blockQueueRatisThree, RATIS_THREE, conf);
+        validateAndRefillBlocksUtil(blockQueueRS_3_2, RS_3_2_1024, conf);
+        validateAndRefillBlocksUtil(blockQueueRS_6_3, RS_6_3_1024, conf);
+        validateAndRefillBlocksUtil(blockQueueXOR_10_4, XOR_10_4_4096, conf);
+    }
 
+    private void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue, ReplicationConfig replicationConfig,
+                                              ConfigurationSource conf) throws IOException  {
         blockQueue.removeIf(block -> {
             boolean isValid = isBlockValid(block);
             if (!isValid) {
@@ -140,7 +167,7 @@ public class OMBlockPrefetchClient {
         if (blockQueue.size() < minBlocks) {
             int blocksToPrefetch = maxBlocks - blockQueue.size();
             LOG.info("Block queue size below threshold. Fetching {} more blocks.", blocksToPrefetch);
-            prefetchBlocks(blocksToPrefetch);
+            prefetchBlocks(blocksToPrefetch, replicationConfig, blockQueue);
         }
     }
 

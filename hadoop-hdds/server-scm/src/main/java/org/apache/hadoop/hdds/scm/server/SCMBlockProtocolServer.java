@@ -254,6 +254,68 @@ public class SCMBlockProtocolServer implements
     }
   }
 
+  @Override
+  public List<AllocatedBlock> allocateBlock(
+          long size, int num,
+          ReplicationConfig replicationConfig,
+          String owner, ExcludeList excludeList,
+          String clientMachine, boolean forceContainerCreate) throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("size", String.valueOf(size));
+    auditMap.put("num", String.valueOf(num));
+    auditMap.put("replication", replicationConfig.toString());
+    auditMap.put("owner", owner);
+    auditMap.put("client", clientMachine);
+    List<AllocatedBlock> blocks = new ArrayList<>(num);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Allocating {} blocks of size {}, with {}",
+              num, size, excludeList);
+    }
+    try {
+      for (int i = 0; i < num; i++) {
+        AllocatedBlock block = scm.getScmBlockManager()
+                .allocateBlock(size, replicationConfig, owner, excludeList, forceContainerCreate);
+        if (block != null) {
+          // Sort the datanodes if client machine is specified
+          final Node client = getClientNode(clientMachine);
+          if (client != null) {
+            final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
+            final List<DatanodeDetails> sorted = scm.getClusterMap()
+                    .sortByDistanceCost(client, nodes, nodes.size());
+            if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
+              block = block.toBuilder()
+                      .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
+                      .build();
+            }
+          }
+          blocks.add(block);
+        }
+      }
+
+      auditMap.put("allocated", String.valueOf(blocks.size()));
+
+      if (blocks.size() < num) {
+        AUDIT.logWriteFailure(buildAuditMessageForFailure(
+                SCMAction.ALLOCATE_BLOCK, auditMap, null)
+        );
+      } else {
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+                SCMAction.ALLOCATE_BLOCK, auditMap));
+      }
+
+      return blocks;
+    } catch (TimeoutException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+              SCMAction.ALLOCATE_BLOCK, auditMap, ex));
+      throw new IOException(ex);
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+              SCMAction.ALLOCATE_BLOCK, auditMap, ex));
+      throw ex;
+    }
+  }
+
   /**
    * Delete blocks for a set of object keys.
    *

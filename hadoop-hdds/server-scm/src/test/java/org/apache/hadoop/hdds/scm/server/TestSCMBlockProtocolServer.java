@@ -129,6 +129,36 @@ public class TestSCMBlockProtocolServer {
     }
 
     @Override
+    public AllocatedBlock allocateBlock(long size,
+                                        ReplicationConfig replicationConfig, String owner,
+                                        ExcludeList excludeList,
+                                        boolean forceContainerCreate) throws IOException, TimeoutException {
+      List<DatanodeDetails> nodes = new ArrayList<>(datanodes);
+      Collections.shuffle(nodes);
+      Pipeline pipeline;
+
+      if (replicationConfig !=
+              RatisReplicationConfig.getInstance(ReplicationFactor.THREE)) {
+        // Other replication config can be supported in the future
+        return null;
+      }
+
+      pipeline = Pipeline.newBuilder()
+              .setId(PipelineID.randomId())
+              .setState(PipelineState.OPEN)
+              .setReplicationConfig(replicationConfig)
+              .setNodes(nodes.subList(0, 3))
+              .build();
+
+      long localID = ThreadLocalRandom.current().nextLong();
+      long containerID = ThreadLocalRandom.current().nextLong();
+      AllocatedBlock.Builder abb = new AllocatedBlock.Builder()
+              .setContainerBlockID(new ContainerBlockID(containerID, localID))
+              .setPipeline(pipeline);
+      return abb.build();
+    }
+
+    @Override
     public void deleteBlocks(List<BlockGroup> blockIDs) throws IOException {
 
     }

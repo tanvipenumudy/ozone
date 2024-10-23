@@ -150,6 +150,94 @@ public class WritableRatisContainerProvider
             + ", replicationConfig: " + repConfig + ". " + failureReason);
   }
 
+  @Override
+  public ContainerInfo getContainer(final long size,
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList, boolean forceContainerCreate)
+      throws IOException {
+    /*
+      Here is the high level logic.
+
+      1. We try to find pipelines in open state.
+
+      2. If there are no pipelines in OPEN state, then we try to create one.
+
+      3. We allocate a block from the available containers in the selected
+      pipeline.
+
+      TODO : #CLUTIL Support random picking of two containers from the list.
+      So we can use different kind of policies.
+    */
+
+    String failureReason = null;
+
+    //TODO we need to continue the refactor to use repConfig everywhere
+    //in downstream managers.
+
+    PipelineRequestInformation req =
+        PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
+
+    ContainerInfo containerInfo =
+        getContainer(repConfig, owner, excludeList, req);
+    if (containerInfo != null) {
+      return containerInfo;
+    }
+
+    try {
+      // TODO: #CLUTIL Remove creation logic when all replication types
+      //  and factors are handled by pipeline creator
+      Pipeline pipeline = pipelineManager.createPipeline(repConfig);
+
+      // wait until pipeline is ready
+      pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+
+    } catch (SCMException se) {
+      LOG.warn("Pipeline creation failed for repConfig {} " +
+          "Datanodes may be used up. Try to see if any pipeline is in " +
+              "ALLOCATED state, and then will wait for it to be OPEN",
+              repConfig, se);
+      List<Pipeline> allocatedPipelines = findPipelinesByState(repConfig,
+              excludeList,
+              Pipeline.PipelineState.ALLOCATED);
+      if (!allocatedPipelines.isEmpty()) {
+        List<PipelineID> allocatedPipelineIDs =
+                allocatedPipelines.stream()
+                        .map(p -> p.getId())
+                        .collect(Collectors.toList());
+        try {
+          pipelineManager
+                  .waitOnePipelineReady(allocatedPipelineIDs, 0);
+        } catch (IOException e) {
+          LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
+                  allocatedPipelineIDs, e);
+          failureReason = "Waiting for one of pipelines to be OPEN failed. "
+              + e.getMessage();
+        }
+      } else {
+        failureReason = se.getMessage();
+      }
+    } catch (IOException e) {
+      LOG.warn("Pipeline creation failed for repConfig: {}. "
+          + "Retrying get pipelines call once.", repConfig, e);
+      failureReason = e.getMessage();
+    }
+
+    // If Exception occurred or successful creation of pipeline do one
+    // final try to fetch pipelines.
+    containerInfo = getContainer(repConfig, owner, excludeList, req);
+    if (containerInfo != null) {
+      return containerInfo;
+    }
+
+    // we have tried all strategies we know but somehow we are not able
+    // to get a container for this block. Log that info and throw an exception.
+    LOG.error(
+        "Unable to allocate a block for the size: {}, repConfig: {}",
+        size, repConfig);
+    throw new IOException(
+        "Unable to allocate a container to the block of size: " + size
+            + ", replicationConfig: " + repConfig + ". " + failureReason);
+  }
+
   @Nullable
   private ContainerInfo getContainer(ReplicationConfig repConfig, String owner,
       ExcludeList excludeList, PipelineRequestInformation req) {

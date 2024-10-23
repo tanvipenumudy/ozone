@@ -39,6 +39,7 @@ enum Type {
   SortDatanodes      = 14;
   AddScm             = 15;
   GetClusterTree     = 16;
+  AllocateScmBlockForce   = 17
 }
 
 message SCMBlockLocationRequest {
@@ -57,6 +58,7 @@ message SCMBlockLocationRequest {
   optional SortDatanodesRequestProto          sortDatanodesRequest      = 14;
   optional hadoop.hdds.AddScmRequestProto     addScmRequestProto       = 15;
   optional GetClusterTreeRequestProto         getClusterTreeRequest     = 16;
+  optional AllocateScmBlockRequestForceProto       allocateScmBlockRequestForce   = 17;
 }
 
 message SCMBlockLocationResponse {
@@ -159,6 +161,22 @@ message AllocateScmBlockRequestProto {
   optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
 
   optional string client = 9;
+
+}
+
+message AllocateScmBlockRequestForceProto {
+  required uint64 size = 1;
+  required uint32 numBlocks = 2;
+  required ReplicationType type = 3;
+  optional hadoop.hdds.ReplicationFactor factor = 4;
+  required string owner = 5;
+  optional ExcludeListProto excludeList = 7;
+
+  //used for EC replicaiton instead of the replication factor
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 8;
+
+  optional string client = 9;
+  required bool forceContainerCreate = 10;
 
 }
 

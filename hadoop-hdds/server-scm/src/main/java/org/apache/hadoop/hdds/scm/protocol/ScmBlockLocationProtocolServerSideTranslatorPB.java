@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestForceProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteKeyBlocksResultProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
@@ -144,6 +145,21 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         response.setAllocateScmBlockResponse(allocateScmBlock(
             request.getAllocateScmBlockRequest(), request.getVersion()));
         break;
+      case AllocateScmBlockForce:
+        if (scm.getLayoutVersionManager().needsFinalization() &&
+            !scm.getLayoutVersionManager()
+                .isAllowed(HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)
+        ) {
+          if (request.getAllocateScmBlockRequestForce().hasEcReplicationConfig()) {
+            throw new SCMException("Cluster is not finalized yet, it is"
+                + " not enabled to create blocks with Erasure Coded"
+                + " replication type.",
+                SCMException.ResultCodes.INTERNAL_ERROR);
+          }
+        }
+        response.setAllocateScmBlockResponse(allocateScmBlockForce(
+            request.getAllocateScmBlockRequestForce(), request.getVersion()));
+        break;
       case DeleteScmKeyBlocks:
         response.setDeleteScmKeyBlocksResponse(
             deleteScmKeyBlocks(request.getDeleteScmKeyBlocksRequest()));
@@ -217,6 +233,38 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       builder.addBlocks(AllocateBlockResponse.newBuilder()
           .setContainerBlockID(block.getBlockID().getProtobuf())
           .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
+    }
+
+    return builder.build();
+  }
+
+  public AllocateScmBlockResponseProto allocateScmBlockForce(
+          AllocateScmBlockRequestProto request, int clientVersion)
+          throws IOException {
+    List<AllocatedBlock> allocatedBlocks =
+            impl.allocateBlock(request.getSize(),
+                    request.getNumBlocks(),
+                    ReplicationConfig.fromProto(
+                            request.getType(),
+                            request.getFactor(),
+                            request.getEcReplicationConfig()),
+                    request.getOwner(),
+                    ExcludeList.getFromProtoBuf(request.getExcludeList()),
+                    request.getClient(),
+                    request.getForceContainerCreate());
+
+    AllocateScmBlockResponseProto.Builder builder =
+            AllocateScmBlockResponseProto.newBuilder();
+
+    if (allocatedBlocks.size() < request.getNumBlocks()) {
+      throw new SCMException("Allocated " + allocatedBlocks.size() +
+              " blocks. Requested " + request.getNumBlocks() + " blocks",
+              SCMException.ResultCodes.FAILED_TO_ALLOCATE_ENOUGH_BLOCKS);
+    }
+    for (AllocatedBlock block : allocatedBlocks) {
+      builder.addBlocks(AllocateBlockResponse.newBuilder()
+              .setContainerBlockID(block.getBlockID().getProtobuf())
+              .setPipeline(block.getPipeline().getProtobufMessage(clientVersion)));
     }
 
     return builder.build();

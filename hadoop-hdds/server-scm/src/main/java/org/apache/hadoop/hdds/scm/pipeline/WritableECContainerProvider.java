@@ -184,6 +184,99 @@ public class WritableECContainerProvider
     }
   }
 
+    @Override
+  public ContainerInfo getContainer(final long size,
+      ECReplicationConfig repConfig, String owner, ExcludeList excludeList, boolean forceContainerCreate)
+      throws IOException {
+    int maximumPipelines = getMaximumPipelines(repConfig);
+    int openPipelineCount;
+    synchronized (this) {
+      openPipelineCount = pipelineManager.getPipelineCount(repConfig,
+          Pipeline.PipelineState.OPEN);
+      if (openPipelineCount < maximumPipelines) {
+        try {
+          return allocateContainer(repConfig, size, owner, excludeList);
+        } catch (IOException e) {
+          LOG.warn("Unable to allocate a container with {} existing ones; "
+              + "requested size={}, replication={}, owner={}, {}",
+              openPipelineCount, size, repConfig, owner, excludeList, e);
+        }
+      } else if (LOG.isDebugEnabled()) {
+        LOG.debug("Pipeline count {} reached limit {}, checking existing ones; "
+            + "requested size={}, replication={}, owner={}, {}",
+            openPipelineCount, maximumPipelines, size, repConfig, owner,
+            excludeList);
+      }
+    }
+    List<Pipeline> existingPipelines = pipelineManager.getPipelines(
+        repConfig, Pipeline.PipelineState.OPEN);
+    final int pipelineCount = existingPipelines.size();
+    LOG.debug("Checking existing pipelines: {}", existingPipelines);
+
+    PipelineRequestInformation pri =
+        PipelineRequestInformation.Builder.getBuilder()
+            .setSize(size)
+            .build();
+    while (existingPipelines.size() > 0) {
+      int pipelineIndex =
+          pipelineChoosePolicy.choosePipelineIndex(existingPipelines, pri);
+      if (pipelineIndex < 0) {
+        LOG.warn("Unable to select a pipeline from {} in the list",
+            existingPipelines.size());
+        break;
+      }
+      Pipeline pipeline = existingPipelines.get(pipelineIndex);
+      synchronized (pipeline.getId()) {
+        try {
+          ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
+          if (containerInfo == null
+              || !containerHasSpace(containerInfo, size)) {
+            existingPipelines.remove(pipelineIndex);
+            pipelineManager.closePipeline(pipeline, true);
+            openPipelineCount--;
+          } else {
+            if (pipelineIsExcluded(pipeline, containerInfo, excludeList)) {
+              existingPipelines.remove(pipelineIndex);
+            } else {
+              containerInfo.updateLastUsedTime();
+              return containerInfo;
+            }
+          }
+        } catch (PipelineNotFoundException | ContainerNotFoundException e) {
+          LOG.warn("Pipeline or container not found when selecting a writable "
+              + "container", e);
+          existingPipelines.remove(pipelineIndex);
+          pipelineManager.closePipeline(pipeline, true);
+          openPipelineCount--;
+        }
+      }
+    }
+    // If we get here, all the pipelines we tried were no good. So try to
+    // allocate a new one.
+    try {
+      if (openPipelineCount >= maximumPipelines) {
+        final int nodeCount = nodeManager.getNodeCount(inServiceHealthy());
+        if (nodeCount > maximumPipelines) {
+          LOG.debug("Increasing pipeline limit {} -> {} for final attempt",
+              maximumPipelines, nodeCount);
+          maximumPipelines = nodeCount;
+        }
+      }
+      if (openPipelineCount < maximumPipelines) {
+        synchronized (this) {
+          return allocateContainer(repConfig, size, owner, excludeList);
+        }
+      }
+      throw new IOException("Pipeline limit (" + maximumPipelines
+          + ") reached (" + openPipelineCount + "), none closed");
+    } catch (IOException e) {
+      LOG.warn("Unable to allocate a container after trying {} existing ones; "
+          + "requested size={}, replication={}, owner={}, {}",
+          pipelineCount, size, repConfig, owner, excludeList, e);
+      throw e;
+    }
+  }
+
   private int getMaximumPipelines(ECReplicationConfig repConfig) {
     final double factor = providerConfig.getPipelinePerVolumeFactor();
     int volumeBasedCount = 0;
