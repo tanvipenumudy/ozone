@@ -193,7 +193,7 @@ public class WritableECContainerProvider
     synchronized (this) {
       openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < maximumPipelines) {
+      if (forceContainerCreate) {
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
