@@ -367,6 +367,32 @@ public class ContainerManagerImpl implements ContainerManager {
     }
   }
 
+    @Override
+  public ContainerInfo getMatchingContainer(final long size, final String owner,
+      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs, boolean forceContainerCreate) {
+    NavigableSet<ContainerID> containerIDs;
+    ContainerInfo containerInfo;
+    try {
+      synchronized (pipeline.getId()) {
+        containerIDs = getContainersForOwner(pipeline, owner);
+        if (forceContainerCreate) {
+          allocateContainer(pipeline, owner);
+          containerIDs = getContainersForOwner(pipeline, owner);
+        }
+        containerIDs.removeAll(excludedContainerIDs);
+        containerInfo = containerStateManager.getMatchingContainer(
+            size, owner, pipeline.getId(), containerIDs);
+        if (containerInfo == null) {
+          containerInfo = allocateContainer(pipeline, owner);
+        }
+        return containerInfo;
+      }
+    } catch (Exception e) {
+      LOG.warn("Container allocation failed on pipeline={}", pipeline, e);
+      return null;
+    }
+  }
+
   private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
     int minContainerCountPerDn = numContainerPerVolume *
         pipelineManager.minHealthyVolumeNum(pipeline);

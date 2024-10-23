@@ -177,7 +177,7 @@ public class WritableRatisContainerProvider
         PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
 
     ContainerInfo containerInfo =
-        getContainer(repConfig, owner, excludeList, req);
+        getContainer(repConfig, owner, excludeList, req, forceContainerCreate);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -223,7 +223,7 @@ public class WritableRatisContainerProvider
 
     // If Exception occurred or successful creation of pipeline do one
     // final try to fetch pipelines.
-    containerInfo = getContainer(repConfig, owner, excludeList, req);
+    containerInfo = getContainer(repConfig, owner, excludeList, req, forceContainerCreate);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -249,6 +249,22 @@ public class WritableRatisContainerProvider
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
           excludeList, Pipeline.PipelineState.OPEN);
       return selectContainer(availablePipelines, req, owner, excludeList);
+    } finally {
+      pipelineManager.releaseReadLock();
+    }
+  }
+
+  @Nullable
+  private ContainerInfo getContainer(ReplicationConfig repConfig, String owner,
+      ExcludeList excludeList, PipelineRequestInformation req, boolean forceContainerCreate) {
+    // Acquire pipeline manager lock, to avoid any updates to pipeline
+    // while allocate container happens. This is to avoid scenario like
+    // mentioned in HDDS-5655.
+    pipelineManager.acquireReadLock();
+    try {
+      List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
+          excludeList, Pipeline.PipelineState.OPEN);
+      return selectContainer(availablePipelines, req, owner, excludeList, forceContainerCreate);
     } finally {
       pipelineManager.releaseReadLock();
     }
@@ -280,6 +296,28 @@ public class WritableRatisContainerProvider
       // look for OPEN containers that match the criteria.
       final ContainerInfo containerInfo = containerManager.getMatchingContainer(
           req.getSize(), owner, pipeline, excludeList.getContainerIds());
+
+      if (containerInfo != null) {
+        return containerInfo;
+      }
+
+      availablePipelines.remove(pipeline);
+    }
+
+    return null;
+  }
+
+    private @Nullable ContainerInfo selectContainer(
+      List<Pipeline> availablePipelines, PipelineRequestInformation req,
+      String owner, ExcludeList excludeList, boolean forceContainerCreate) {
+
+    while (!availablePipelines.isEmpty()) {
+      Pipeline pipeline = pipelineChoosePolicy.choosePipeline(
+          availablePipelines, req);
+
+      // look for OPEN containers that match the criteria.
+      final ContainerInfo containerInfo = containerManager.getMatchingContainer(
+          req.getSize(), owner, pipeline, excludeList.getContainerIds(), forceContainerCreate);
 
       if (containerInfo != null) {
         return containerInfo;

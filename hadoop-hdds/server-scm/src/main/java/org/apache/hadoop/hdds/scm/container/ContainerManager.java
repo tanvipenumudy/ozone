@@ -195,6 +195,11 @@ public interface ContainerManager extends Closeable {
                                      Pipeline pipeline,
                                      Set<ContainerID> excludedContainerIDS);
 
+  ContainerInfo getMatchingContainer(long size, String owner,
+                                     Pipeline pipeline,
+                                     Set<ContainerID> excludedContainerIDS,
+                                     boolean forceContainerCreate);
+
   /**
    * Once after report processor handler completes, call this to notify
    * container manager to increment metrics.
