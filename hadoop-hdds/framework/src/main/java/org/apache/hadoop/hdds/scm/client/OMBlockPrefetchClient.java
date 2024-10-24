@@ -1,14 +1,20 @@
 package org.apache.hadoop.hdds.scm.client;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import org.apache.commons.lang3.tuple.Pair;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -43,7 +51,7 @@ public class OMBlockPrefetchClient {
     private final LinkedList<AllocatedBlock> blockQueueRS_3_2 = new LinkedList<>();
     private final LinkedList<AllocatedBlock> blockQueueRS_6_3 = new LinkedList<>();
     private final LinkedList<AllocatedBlock> blockQueueXOR_10_4 = new LinkedList<>();
-
+    private ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue = new ConcurrentLinkedQueue<>();
     private ScheduledExecutorService executorService;
     private int maxBlocks, minBlocks;
     private boolean grpcBlockTokenEnabled;
@@ -75,6 +83,12 @@ public class OMBlockPrefetchClient {
         this.serviceID = serviceID;
     }
 
+    public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockLocationProtocol, String serviceID, String clientMachine, ExcludeList excludeList) {
+        this.scmBlockLocationProtocol = scmBlockLocationProtocol;
+        this.serviceID = serviceID;
+        queueExcludeList(clientMachine, excludeList);
+    }
+
     public void start(ConfigurationSource conf) throws IOException {
         this.maxBlocks = conf.getInt(OZONE_OM_PREFETCH_MAX_BLOCKS, OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
         this.minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS, OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
@@ -103,6 +117,11 @@ public class OMBlockPrefetchClient {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    private void queueExcludeList(String clientMachine, ExcludeList excludeList) {
+        excludeListQueue.removeIf(pair -> pair.getLeft().equals(clientMachine));
+        excludeListQueue.add(Pair.of(clientMachine, excludeList));
     }
 
     private synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
@@ -137,7 +156,8 @@ public class OMBlockPrefetchClient {
 
         executorService.scheduleAtFixedRate(() -> {
             try {
-                validateAndRefillBlocks(conf);
+                excludeListQueue = new ConcurrentLinkedQueue<>();
+                validateAndRefillBlocks(conf, excludeListQueue);
             } catch (IOException ex) {
                 LOG.error("Error in block validation or refill", ex);
             }
@@ -151,19 +171,21 @@ public class OMBlockPrefetchClient {
         return Duration.ofMillis(refreshDurationInMs);
     }
 
-    private synchronized void validateAndRefillBlocks(ConfigurationSource conf) throws IOException {
+    private synchronized void validateAndRefillBlocks(ConfigurationSource conf,
+                                                      ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue)
+        throws IOException {
         LOG.info("Validating cached allocated blocks...");
-        validateAndRefillBlocksUtil(blockQueueRatisOne, RATIS_ONE, conf);
-        validateAndRefillBlocksUtil(blockQueueRatisThree, RATIS_THREE, conf);
-        validateAndRefillBlocksUtil(blockQueueRS_3_2, RS_3_2_1024, conf);
-        validateAndRefillBlocksUtil(blockQueueRS_6_3, RS_6_3_1024, conf);
-        validateAndRefillBlocksUtil(blockQueueXOR_10_4, XOR_10_4_4096, conf);
+        validateAndRefillBlocksUtil(blockQueueRatisOne, RATIS_ONE, excludeListQueue);
+        validateAndRefillBlocksUtil(blockQueueRatisThree, RATIS_THREE, excludeListQueue);
+        validateAndRefillBlocksUtil(blockQueueRS_3_2, RS_3_2_1024, excludeListQueue);
+        validateAndRefillBlocksUtil(blockQueueRS_6_3, RS_6_3_1024, excludeListQueue);
+        validateAndRefillBlocksUtil(blockQueueXOR_10_4, XOR_10_4_4096, excludeListQueue);
     }
 
     private void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue, ReplicationConfig replicationConfig,
-                                              ConfigurationSource conf) throws IOException  {
+                                              ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) throws IOException  {
         blockQueue.removeIf(block -> {
-            boolean isValid = isBlockValid(block);
+            boolean isValid = isBlockValid(block, excludeListQueue);
             if (!isValid) {
                 LOG.info("Block {} is no longer valid and will be replaced", block.getBlockID());
             }
@@ -177,11 +199,35 @@ public class OMBlockPrefetchClient {
         }
     }
 
-    private boolean isBlockValid(AllocatedBlock block) {
+    private boolean isBlockValid(AllocatedBlock block,
+                                 ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) {
+
+        ContainerBlockID blockID = block.getBlockID();
+        Pipeline pipeline = block.getPipeline();
+
+        for (Pair<String, ExcludeList> entry : excludeListQueue) {
+            ExcludeList excludeList = entry.getRight();
+
+            for (DatanodeDetails datanode : pipeline.getNodes()) {
+                if (excludeList.getDatanodes().contains(datanode)) {
+                    return false;
+                }
+            }
+
+            if (excludeList.getContainerIds().contains(blockID.getContainerID())) {
+                return false;
+            }
+
+            if (excludeList.getPipelineIds().contains(pipeline.getId())) {
+                return false;
+            }
+        }
         return true;
     }
 
-    public synchronized AllocatedBlock getBlock() {
+    public synchronized AllocatedBlock getBlock(String clientMachine, OzoneBlockTokenSecretManager secretManager,
+                                                ReplicationConfig replicationConfig, long requestedSize,
+                                                boolean shouldSortDatanodes, UserInfo userInfo, ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto) {
         return blockQueue.pollFirst();
     }
 }
