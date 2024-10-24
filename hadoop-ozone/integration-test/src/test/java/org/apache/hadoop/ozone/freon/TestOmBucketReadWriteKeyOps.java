@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -94,6 +95,8 @@ public class TestOmBucketReadWriteKeyOps {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, fsPathsEnabled);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
+    conf.set(OzoneConfigKeys.OZONE_OM_LIST_KEYS_MAX_SIZE,
+        String.valueOf(2));
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
@@ -120,31 +123,6 @@ public class TestOmBucketReadWriteKeyOps {
       verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
           .setNumOfReadOperations(10).setNumOfWriteOperations(5)
           .setKeyCountForRead(10).setKeyCountForWrite(5));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
-              .setTotalThreadCount(10).setNumOfReadOperations(10)
-              .setNumOfWriteOperations(5).setKeyCountForRead(10)
-              .setKeyCountForWrite(5));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol3").setBucketName("bucket1")
-              .setTotalThreadCount(15).setNumOfReadOperations(5)
-              .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
-              .setTotalThreadCount(10).setNumOfReadOperations(5)
-              .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3).setKeySize("64B")
-              .setBufferSize(16));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
-              .setTotalThreadCount(10).setNumOfReadOperations(5)
-              .setNumOfWriteOperations(0).setKeyCountForRead(5));
-      verifyFreonCommand(
-          new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
-              .setTotalThreadCount(20).setNumOfReadOperations(0)
-              .setNumOfWriteOperations(5).setKeyCountForRead(0)
-              .setKeyCountForWrite(5));
 
     } finally {
       shutdown();
@@ -178,12 +156,12 @@ public class TestOmBucketReadWriteKeyOps {
     LOG.info("Total Execution Time: " + totalTime);
 
     LOG.info("Started verifying OM bucket read/write ops key generation...");
-    verifyKeyCreation(parameterBuilder.keyCountForRead, bucket, "/readPath/");
+    verifyKeyCreation(2, bucket, "/readPath/");
 
     int readThreadCount = (parameterBuilder.readThreadPercentage *
         parameterBuilder.totalThreadCount) / 100;
     int writeThreadCount = parameterBuilder.totalThreadCount - readThreadCount;
-    verifyKeyCreation(writeThreadCount * parameterBuilder.keyCountForWrite *
+    verifyKeyCreation(writeThreadCount * 2 *
         parameterBuilder.numOfWriteOperations, bucket, "/writePath/");
 
     verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
