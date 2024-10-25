@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -156,12 +157,12 @@ public class TestOmBucketReadWriteKeyOps {
     LOG.info("Total Execution Time: " + totalTime);
 
     LOG.info("Started verifying OM bucket read/write ops key generation...");
-    verifyKeyCreation(2, bucket, "/readPath/");
+    verifyKeyCreation(parameterBuilder.keyCountForRead, bucket, "/readPath/");
 
     int readThreadCount = (parameterBuilder.readThreadPercentage *
         parameterBuilder.totalThreadCount) / 100;
     int writeThreadCount = parameterBuilder.totalThreadCount - readThreadCount;
-    verifyKeyCreation(writeThreadCount * 2 *
+    verifyKeyCreation(writeThreadCount * parameterBuilder.keyCountForWrite *
         parameterBuilder.numOfWriteOperations, bucket, "/writePath/");
 
     verifyOMLockMetrics(cluster.getOzoneManager().getMetadataManager().getLock()
@@ -177,6 +178,13 @@ public class TestOmBucketReadWriteKeyOps {
       ++actual;
     }
     assertEquals(expectedCount, actual, "Mismatch Count!");
+    verifyOMMetrics((int) Math.ceil(expectedCount /
+        conf.getInt(OzoneConfigKeys.OZONE_OM_LIST_KEYS_MAX_SIZE, OzoneConfigKeys.OZONE_OM_LIST_KEYS_MAX_SIZE_DEFAULT)),
+        cluster.getOzoneManager().getMetrics());
+  }
+
+  private void verifyOMMetrics(int ceil, OMMetrics metrics) {
+    assertEquals(ceil, metrics.getNumKeyLists());
   }
 
   private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
