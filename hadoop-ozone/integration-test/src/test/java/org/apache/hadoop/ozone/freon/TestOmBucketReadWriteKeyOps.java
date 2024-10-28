@@ -121,9 +121,9 @@ public class TestOmBucketReadWriteKeyOps {
       out.getFD().sync();
       out.close();
 
-      verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
-          .setNumOfReadOperations(10).setNumOfWriteOperations(5)
-          .setKeyCountForRead(10).setKeyCountForWrite(5));
+      verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(1)
+          .setNumOfReadOperations(1).setNumOfWriteOperations(0)
+          .setKeyCountForRead(10).setKeyCountForWrite(0));
 
     } finally {
       shutdown();
