@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -373,6 +374,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private CertificateClient certClient;
   private SecretKeySignerClient secretKeyClient;
   private ScmTopologyClient scmTopologyClient;
+  private OMBlockPrefetchClient omBlockPrefetchClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
@@ -624,6 +626,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // verifies that the SCM info in the OM Version file is correct.
     final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
+    omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient, omNodeDetails.getServiceId());
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
@@ -1175,8 +1178,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.scmTopologyClient = scmTopologyClient;
   }
 
+  @VisibleForTesting
+  public void setOmBlockPrefetchClient(
+      OMBlockPrefetchClient omBlockPrefetchClient) {
+    this.omBlockPrefetchClient = omBlockPrefetchClient;
+  }
+
   public NetworkTopology getClusterMap() {
     return scmTopologyClient.getClusterMap();
+  }
+
+  public OMBlockPrefetchClient getOmBlockPrefetchClient() {
+    return omBlockPrefetchClient;
   }
 
   /**
@@ -1744,6 +1757,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omS3gGrpcServer.start();
       isOmGrpcServerRunning = true;
     }
+
+    try {
+      omBlockPrefetchClient.start(configuration);
+    } catch (IOException ex) {
+      LOG.error("Unable to initialize OMBlockPrefetchClient ", ex);
+      throw new UncheckedIOException(ex);
+    }
+
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -2271,6 +2292,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.
+      if (omBlockPrefetchClient != null) {
+        omBlockPrefetchClient.stop();
+      }
+
       if (metricsTimer != null) {
         metricsTimer.cancel();
         metricsTimer = null;

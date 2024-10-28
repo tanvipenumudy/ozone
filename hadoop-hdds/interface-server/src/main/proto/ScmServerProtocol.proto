@@ -39,7 +39,7 @@ enum Type {
   SortDatanodes      = 14;
   AddScm             = 15;
   GetClusterTree     = 16;
-  AllocateScmBlockForce   = 17
+  AllocateScmBlockForce   = 17;
 }
 
 message SCMBlockLocationRequest {

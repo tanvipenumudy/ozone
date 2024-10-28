@@ -1,28 +1,37 @@
 package org.apache.hadoop.hdds.scm.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -32,6 +41,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MIN_BLOCKS;
@@ -45,20 +55,23 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 
 public class OMBlockPrefetchClient {
     private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
-    private final ScmBlockLocationProtocol scmBlockLocationProtocol;
-    private final LinkedList<AllocatedBlock> blockQueueRatisOne = new LinkedList<>();
-    private final LinkedList<AllocatedBlock> blockQueueRatisThree = new LinkedList<>();
-    private final LinkedList<AllocatedBlock> blockQueueRS_3_2 = new LinkedList<>();
-    private final LinkedList<AllocatedBlock> blockQueueRS_6_3 = new LinkedList<>();
-    private final LinkedList<AllocatedBlock> blockQueueXOR_10_4 = new LinkedList<>();
-    private ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue = new ConcurrentLinkedQueue<>();
+    private static ScmBlockLocationProtocol scmBlockLocationProtocol = null;
+    private static final LinkedList<AllocatedBlock> blockQueueRatisOne = new LinkedList<>();
+    private static final LinkedList<AllocatedBlock> blockQueueRatisThree = new LinkedList<>();
+    private static final LinkedList<AllocatedBlock> blockQueueRS_3_2 = new LinkedList<>();
+    private static final LinkedList<AllocatedBlock> blockQueueRS_6_3 = new LinkedList<>();
+    private static final LinkedList<AllocatedBlock> blockQueueXOR_10_4 = new LinkedList<>();
+    private static ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue = new ConcurrentLinkedQueue<>();
     private ScheduledExecutorService executorService;
-    private int maxBlocks, minBlocks;
+    private static int maxBlocks;
+    private static int minBlocks;
+    private static boolean useHostname;
+    private static DNSToSwitchMapping dnsToSwitchMapping;
     private boolean grpcBlockTokenEnabled;
     private int preallocateBlocksMax;
-    private long scmBlockSize;
+    private static long scmBlockSize;
     private long checkInterval;
-    private String serviceID;
+    private static String serviceID;
     private static final ReplicationConfig RATIS_THREE =
             ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.THREE);
@@ -83,24 +96,31 @@ public class OMBlockPrefetchClient {
         this.serviceID = serviceID;
     }
 
-    public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockLocationProtocol, String serviceID, String clientMachine, ExcludeList excludeList) {
-        this.scmBlockLocationProtocol = scmBlockLocationProtocol;
-        this.serviceID = serviceID;
-        queueExcludeList(clientMachine, excludeList);
-    }
-
     public void start(ConfigurationSource conf) throws IOException {
-        this.maxBlocks = conf.getInt(OZONE_OM_PREFETCH_MAX_BLOCKS, OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
-        this.minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS, OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
+        maxBlocks = conf.getInt(OZONE_OM_PREFETCH_MAX_BLOCKS, OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
+        minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS, OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
         this.grpcBlockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED, HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
         this.preallocateBlocksMax = conf.getInt(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
-        this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
+        scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
                 OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+        useHostname = conf.getBoolean(
+            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
         prefetchBlocks(maxBlocks, RATIS_THREE, blockQueueRatisThree);
         prefetchBlocks(maxBlocks, RATIS_ONE, blockQueueRatisOne);
         prefetchBlocks(maxBlocks, RS_3_2_1024, blockQueueRS_3_2);
         prefetchBlocks(maxBlocks, RS_6_3_1024, blockQueueRS_6_3);
         prefetchBlocks(maxBlocks, XOR_10_4_4096, blockQueueXOR_10_4);
+
+        Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+            conf.getClass(DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+                TableMapping.class, DNSToSwitchMapping.class);
+        DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+            dnsToSwitchMappingClass, OzoneConfiguration.of(conf));
+        dnsToSwitchMapping =
+            ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+                : new CachedDNSToSwitchMapping(newInstance));
+
         scheduleBlockValidationAndFetch(conf, Instant.now());
     }
 
@@ -119,13 +139,13 @@ public class OMBlockPrefetchClient {
         }
     }
 
-    private void queueExcludeList(String clientMachine, ExcludeList excludeList) {
+    private static void queueExcludeList(String clientMachine, ExcludeList excludeList) {
         excludeListQueue.removeIf(pair -> pair.getLeft().equals(clientMachine));
         excludeListQueue.add(Pair.of(clientMachine, excludeList));
     }
 
-    private synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
-                                             LinkedList<AllocatedBlock> blockQueue) throws IOException {
+    private static synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
+                                                    LinkedList<AllocatedBlock> blockQueue) throws IOException {
         LOG.info("Prefetching {} AllocatedBlocks from SCM", numBlocks);
         List<AllocatedBlock> replicatedBlocks = allocateBlocksWithReplication(replicationConfig, numBlocks);
         blockQueue.addAll(replicatedBlocks);
@@ -137,8 +157,8 @@ public class OMBlockPrefetchClient {
                 scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "", true);
     }
 
-    private List<AllocatedBlock> allocateBlocksWithReplication(
-            ReplicationConfig replicationConfig, int blockCount) throws IOException {
+    private static List<AllocatedBlock> allocateBlocksWithReplication(
+        ReplicationConfig replicationConfig, int blockCount) throws IOException {
         return scmBlockLocationProtocol.allocateBlock(
                 scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "");
     }
@@ -182,8 +202,9 @@ public class OMBlockPrefetchClient {
         validateAndRefillBlocksUtil(blockQueueXOR_10_4, XOR_10_4_4096, excludeListQueue);
     }
 
-    private void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue, ReplicationConfig replicationConfig,
-                                              ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) throws IOException  {
+    private static void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue,
+                                                    ReplicationConfig replicationConfig,
+                                                    ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) throws IOException  {
         blockQueue.removeIf(block -> {
             boolean isValid = isBlockValid(block, excludeListQueue);
             if (!isValid) {
@@ -199,8 +220,8 @@ public class OMBlockPrefetchClient {
         }
     }
 
-    private boolean isBlockValid(AllocatedBlock block,
-                                 ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) {
+    private static boolean isBlockValid(AllocatedBlock block,
+                                        ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) {
 
         ContainerBlockID blockID = block.getBlockID();
         Pipeline pipeline = block.getPipeline();
@@ -225,9 +246,98 @@ public class OMBlockPrefetchClient {
         return true;
     }
 
-    public synchronized AllocatedBlock getBlock(String clientMachine, OzoneBlockTokenSecretManager secretManager,
-                                                ReplicationConfig replicationConfig, long requestedSize,
-                                                boolean shouldSortDatanodes, UserInfo userInfo, ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto) {
-        return blockQueue.pollFirst();
+    public synchronized static List<AllocatedBlock> getBlock(int numBlocks, ReplicationConfig replicationConfig,
+                                                             String clientMachine, NetworkTopology clusterMap, ExcludeList excludeList) {
+        queueExcludeList(clientMachine, excludeList);
+        LinkedList<AllocatedBlock> blockQueue = getReplicationConfigQueue(replicationConfig);
+        List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
+        for (int i = 0; i < numBlocks && !blockQueue.isEmpty(); i++) {
+            AllocatedBlock block = blockQueue.removeFirst();
+            List<DatanodeDetails> sorted = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
+            if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
+                block = block.toBuilder()
+                    .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
+                    .build();
+            }
+            allocatedBlocks.add(block);
+        }
+        LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
+        return allocatedBlocks;
+    }
+
+    public static boolean queueSufficient(int numBlocks, ReplicationConfig replicationConfig) throws IOException {
+        if (numBlocks < getReplicationConfigQueue(replicationConfig).size()) {
+            validateAndRefillBlocksUtil(getReplicationConfigQueue(replicationConfig), replicationConfig, excludeListQueue);
+            return false;
+        }
+        return true;
+    }
+
+    private static LinkedList<AllocatedBlock> getReplicationConfigQueue(ReplicationConfig replicationConfig) {
+
+        LinkedList<AllocatedBlock> blockQueue = null;
+
+        if (replicationConfig.equals(RATIS_THREE)) {
+            blockQueue = blockQueueRatisThree;
+        } else if (replicationConfig.equals(RATIS_ONE)) {
+            blockQueue = blockQueueRatisOne;
+        } else if (replicationConfig.equals(RS_3_2_1024)) {
+            blockQueue = blockQueueRS_3_2;
+        } else if (replicationConfig.equals(RS_6_3_1024)) {
+            blockQueue = blockQueueRS_6_3;
+        } else if (replicationConfig.equals(XOR_10_4_4096)) {
+            blockQueue = blockQueueXOR_10_4;
+        }
+        return blockQueue;
+    }
+
+    public static List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes,
+                                                      String clientMachine, NetworkTopology clusterMap) {
+        final Node client = getClientNode(clientMachine, nodes, clusterMap);
+        return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+    }
+
+    private static Node getClientNode(String clientMachine,
+                                      List<DatanodeDetails> nodes, NetworkTopology clusterMap) {
+        List<DatanodeDetails> matchingNodes = new ArrayList<>();
+        for (DatanodeDetails node : nodes) {
+            if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
+                clientMachine)) {
+                matchingNodes.add(node);
+            }
+        }
+        return !matchingNodes.isEmpty() ? matchingNodes.get(0) :
+            getOtherNode(clientMachine, clusterMap);
+    }
+
+    private static Node getOtherNode(String clientMachine, NetworkTopology clusterMap) {
+        try {
+            String clientLocation = resolveNodeLocation(clientMachine);
+            if (clientLocation != null) {
+                Node rack = clusterMap.getNode(clientLocation);
+                if (rack instanceof InnerNode) {
+                    return new NodeImpl(clientMachine, clientLocation,
+                        (InnerNode) rack, rack.getLevel() + 1,
+                        NODE_COST_DEFAULT);
+                }
+            }
+        } catch (Exception e) {
+            LOG.info("Could not resolve client {}: {}",
+                clientMachine, e.getMessage());
+        }
+        return null;
+    }
+
+    private static String resolveNodeLocation(String hostname) {
+        List<String> hosts = Collections.singletonList(hostname);
+        List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+        if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+            String location = resolvedHosts.get(0);
+            LOG.debug("Node {} resolved to location {}", hostname, location);
+            return location;
+        } else {
+            LOG.debug("Node resolution did not yield any result for {}", hostname);
+            return null;
+        }
     }
 }

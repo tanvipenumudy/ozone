@@ -39,6 +39,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchClient;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -183,11 +185,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   @SuppressWarnings("parameternumber")
   protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
-      OzoneBlockTokenSecretManager secretManager,
-      ReplicationConfig replicationConfig, ExcludeList excludeList,
-      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+                                                    OzoneBlockTokenSecretManager secretManager,
+                                                    ReplicationConfig replicationConfig, ExcludeList excludeList,
+                                                    long requestedSize, long scmBlockSize, int preallocateBlocksMax,
+                                                    boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
+                                                    boolean shouldSortDatanodes, UserInfo userInfo, OMBlockPrefetchClient omBlockPrefetchClient,
+                                                    NetworkTopology clusterMap)
       throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
@@ -201,11 +204,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
+    List<AllocatedBlock> allocatedBlocks = null;
     try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+      if (!excludeList.isEmpty() || !OMBlockPrefetchClient.queueSufficient(numBlocks, replicationConfig)) {
+        allocatedBlocks = scmClient.getBlockClient().allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
+            excludeList, clientMachine);
+      } else {
+        allocatedBlocks = OMBlockPrefetchClient.getBlock(numBlocks, replicationConfig, clientMachine, clusterMap, excludeList);
+      }
+
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()

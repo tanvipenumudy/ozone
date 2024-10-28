@@ -239,7 +239,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   public AllocateScmBlockResponseProto allocateScmBlockForce(
-          AllocateScmBlockRequestProto request, int clientVersion)
+          AllocateScmBlockRequestForceProto request, int clientVersion)
           throws IOException {
     List<AllocatedBlock> allocatedBlocks =
             impl.allocateBlock(request.getSize(),
