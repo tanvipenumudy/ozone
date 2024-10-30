@@ -4554,14 +4554,14 @@
   </property>
   <property>
     <name>ozone.om.prefetch.max.blocks</name>
-    <value>1000</value>
+    <value>100</value>
     <tag>OZONE, OM</tag>
     <description>
     </description>
   </property>
   <property>
     <name>ozone.om.prefetch.min.blocks</name>
-    <value>400</value>
+    <value>40</value>
     <tag>OZONE, OM</tag>
     <description>
     </description>

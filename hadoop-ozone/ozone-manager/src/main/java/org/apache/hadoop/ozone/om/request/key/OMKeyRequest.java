@@ -221,6 +221,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
       throw ex;
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());

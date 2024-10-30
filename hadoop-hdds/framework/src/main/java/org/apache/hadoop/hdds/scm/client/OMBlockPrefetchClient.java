@@ -1,6 +1,5 @@
 package org.apache.hadoop.hdds.scm.client;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -11,11 +10,11 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.TableMapping;
@@ -23,7 +22,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,11 +30,8 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.*;
+
 import org.apache.commons.lang3.tuple.Pair;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -56,6 +51,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 public class OMBlockPrefetchClient {
     private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
     private static ScmBlockLocationProtocol scmBlockLocationProtocol = null;
+    private static StorageContainerLocationProtocol scmContainerClient = null;
     private static final LinkedList<AllocatedBlock> blockQueueRatisOne = new LinkedList<>();
     private static final LinkedList<AllocatedBlock> blockQueueRatisThree = new LinkedList<>();
     private static final LinkedList<AllocatedBlock> blockQueueRS_3_2 = new LinkedList<>();
@@ -91,12 +87,14 @@ public class OMBlockPrefetchClient {
                 .build();
     }
 
-    public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockLocationProtocol, String serviceID) {
-        this.scmBlockLocationProtocol = scmBlockLocationProtocol;
+    public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient,
+                                 StorageContainerLocationProtocol scmContainerClient, String serviceID) {
+        this.scmBlockLocationProtocol = scmBlockClient;
         this.serviceID = serviceID;
+        this.scmContainerClient = scmContainerClient;
     }
 
-    public void start(ConfigurationSource conf) throws IOException {
+    public void start(ConfigurationSource conf) throws IOException, InterruptedException, TimeoutException {
         maxBlocks = conf.getInt(OZONE_OM_PREFETCH_MAX_BLOCKS, OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
         minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS, OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
         this.grpcBlockTokenEnabled = conf.getBoolean(HDDS_BLOCK_TOKEN_ENABLED, HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
@@ -106,11 +104,14 @@ public class OMBlockPrefetchClient {
         useHostname = conf.getBoolean(
             DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
             DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
-        prefetchBlocks(maxBlocks, RATIS_THREE, blockQueueRatisThree);
-        prefetchBlocks(maxBlocks, RATIS_ONE, blockQueueRatisOne);
-        prefetchBlocks(maxBlocks, RS_3_2_1024, blockQueueRS_3_2);
-        prefetchBlocks(maxBlocks, RS_6_3_1024, blockQueueRS_6_3);
-        prefetchBlocks(maxBlocks, XOR_10_4_4096, blockQueueXOR_10_4);
+
+        // waitTobeOutOfSafeMode();
+
+//        prefetchBlocks(maxBlocks, RATIS_THREE, blockQueueRatisThree);
+//        prefetchBlocks(maxBlocks, RATIS_ONE, blockQueueRatisOne);
+//        prefetchBlocks(maxBlocks, RS_3_2_1024, blockQueueRS_3_2);
+//        prefetchBlocks(maxBlocks, RS_6_3_1024, blockQueueRS_6_3);
+//        prefetchBlocks(maxBlocks, XOR_10_4_4096, blockQueueXOR_10_4);
 
         Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
             conf.getClass(DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
@@ -122,6 +123,47 @@ public class OMBlockPrefetchClient {
                 : new CachedDNSToSwitchMapping(newInstance));
 
         scheduleBlockValidationAndFetch(conf, Instant.now());
+    }
+
+    /*
+    public static class CustomWaitUtils {
+
+        public static void waitForCondition(CheckCondition condition, long checkIntervalMs, long timeoutMs)
+            throws TimeoutException, InterruptedException, IOException {
+            long startTime = System.currentTimeMillis();
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (condition.evaluate()) {
+                    return;
+                }
+                Thread.sleep(checkIntervalMs);
+            }
+            throw new TimeoutException("Condition not met within timeout period");
+        }
+
+        @FunctionalInterface
+        public interface CheckCondition {
+            boolean evaluate() throws IOException;
+        }
+    }
+
+    public void waitTobeOutOfSafeMode() throws TimeoutException, InterruptedException, IOException {
+        CustomWaitUtils.waitForCondition(() -> {
+            if (!scmContainerClient.inSafeMode()) {
+                return true;
+            }
+            LOG.info("Waiting for cluster to be ready. No datanodes found");
+            return false;
+        }, 100, 1000 * 45);
+    }*/
+
+    public static void waitTobeOutOfSafeMode() throws InterruptedException, IOException {
+        while (true) {
+            if (!scmContainerClient.inSafeMode()) {
+                return;
+            }
+            LOG.info("Waiting for cluster to be ready.");
+            Thread.sleep(5000);
+        }
     }
 
     // Stop the background tasks
@@ -147,12 +189,12 @@ public class OMBlockPrefetchClient {
     private static synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
                                                     LinkedList<AllocatedBlock> blockQueue) throws IOException {
         LOG.info("Prefetching {} AllocatedBlocks from SCM", numBlocks);
-        List<AllocatedBlock> replicatedBlocks = allocateBlocksWithReplication(replicationConfig, numBlocks);
+        List<AllocatedBlock> replicatedBlocks = allocateBlocksWithReplicationForce(replicationConfig, numBlocks);
         blockQueue.addAll(replicatedBlocks);
     }
 
-    private List<AllocatedBlock> allocateBlocksWithReplicationForce(
-            ReplicationConfig replicationConfig, int blockCount) throws IOException {
+    private static List<AllocatedBlock> allocateBlocksWithReplicationForce(
+        ReplicationConfig replicationConfig, int blockCount) throws IOException {
         return scmBlockLocationProtocol.allocateBlock(
                 scmBlockSize, blockCount, replicationConfig, serviceID, new ExcludeList(), "", true);
     }
@@ -177,8 +219,9 @@ public class OMBlockPrefetchClient {
         executorService.scheduleAtFixedRate(() -> {
             try {
                 excludeListQueue = new ConcurrentLinkedQueue<>();
+                System.out.println("Refresh duration: " + refreshDuration.toMillis());
                 validateAndRefillBlocks(conf, excludeListQueue);
-            } catch (IOException ex) {
+            } catch (IOException | InterruptedException ex) {
                 LOG.error("Error in block validation or refill", ex);
             }
         }, initialDelay.toMillis(), refreshDuration.toMillis(), TimeUnit.MILLISECONDS);
@@ -187,24 +230,27 @@ public class OMBlockPrefetchClient {
     public static Duration parseRefreshDuration(ConfigurationSource conf) {
         long refreshDurationInMs = conf.getTimeDuration(
                 OZONE_OM_PREFETCHED_BLOCKS_VALIDATION_INTERVAL,
-                OZONE_OM_PREFETCHED_BLOCKS_VALIDATION_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+                OZONE_OM_PREFETCHED_BLOCKS_VALIDATION_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
         return Duration.ofMillis(refreshDurationInMs);
     }
 
     private synchronized void validateAndRefillBlocks(ConfigurationSource conf,
                                                       ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue)
-        throws IOException {
+        throws IOException, InterruptedException {
+        waitTobeOutOfSafeMode();
         LOG.info("Validating cached allocated blocks...");
         validateAndRefillBlocksUtil(blockQueueRatisOne, RATIS_ONE, excludeListQueue);
         validateAndRefillBlocksUtil(blockQueueRatisThree, RATIS_THREE, excludeListQueue);
-        validateAndRefillBlocksUtil(blockQueueRS_3_2, RS_3_2_1024, excludeListQueue);
-        validateAndRefillBlocksUtil(blockQueueRS_6_3, RS_6_3_1024, excludeListQueue);
-        validateAndRefillBlocksUtil(blockQueueXOR_10_4, XOR_10_4_4096, excludeListQueue);
+//        validateAndRefillBlocksUtil(blockQueueRS_3_2, RS_3_2_1024, excludeListQueue);
+//        validateAndRefillBlocksUtil(blockQueueRS_6_3, RS_6_3_1024, excludeListQueue);
+//        validateAndRefillBlocksUtil(blockQueueXOR_10_4, XOR_10_4_4096, excludeListQueue);
     }
 
     private static void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue,
                                                     ReplicationConfig replicationConfig,
-                                                    ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) throws IOException  {
+                                                    ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue)
+        throws IOException, InterruptedException {
+
         blockQueue.removeIf(block -> {
             boolean isValid = isBlockValid(block, excludeListQueue);
             if (!isValid) {
@@ -265,8 +311,9 @@ public class OMBlockPrefetchClient {
         return allocatedBlocks;
     }
 
-    public static boolean queueSufficient(int numBlocks, ReplicationConfig replicationConfig) throws IOException {
-        if (numBlocks < getReplicationConfigQueue(replicationConfig).size()) {
+    public static boolean queueSufficient(int numBlocks, ReplicationConfig replicationConfig)
+        throws IOException, InterruptedException {
+        if (numBlocks > getReplicationConfigQueue(replicationConfig).size()) {
             validateAndRefillBlocksUtil(getReplicationConfigQueue(replicationConfig), replicationConfig, excludeListQueue);
             return false;
         }

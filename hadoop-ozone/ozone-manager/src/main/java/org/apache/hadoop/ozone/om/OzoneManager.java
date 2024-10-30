@@ -51,6 +51,7 @@ import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -626,9 +627,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // verifies that the SCM info in the OM Version file is correct.
     final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
-    omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient, omNodeDetails.getServiceId());
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
+    omBlockPrefetchClient = new OMBlockPrefetchClient(scmBlockClient, scmContainerClient, omNodeDetails.getServiceId());
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -1763,6 +1764,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IOException ex) {
       LOG.error("Unable to initialize OMBlockPrefetchClient ", ex);
       throw new UncheckedIOException(ex);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
     }
 
     registerMXBean();
