@@ -143,10 +143,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException on failure.
    */
   @Override
-  public AllocatedBlock allocateBlock(final long size,
-      ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList)
-      throws IOException {
+  public AllocatedBlock allocateBlock(final long size, ReplicationConfig replicationConfig, String owner,
+                                      ExcludeList excludeList, boolean forceContainerCreate) throws IOException {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , replicationConfig: {}", size, replicationConfig);
     }
@@ -161,7 +159,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     }
 
     ContainerInfo containerInfo = writableContainerFactory.getContainer(
-        size, replicationConfig, owner, excludeList);
+        size, replicationConfig, owner, excludeList, forceContainerCreate);
 
     if (containerInfo != null) {
       return newBlock(containerInfo);

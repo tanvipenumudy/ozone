@@ -884,7 +884,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.addContainerToPipeline(
         allocatedPipeline.getId(), container.containerID());
     doReturn(container).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), eq(allocatedPipeline), any());
+        anyString(), eq(allocatedPipeline), any(), false);
 
 
     assertTrue(pipelineManager.getPipelines(repConfig,  OPEN)
@@ -908,7 +908,7 @@ public class TestPipelineManagerImpl {
 
     
     ContainerInfo c = provider.getContainer(1, repConfig,
-        owner, new ExcludeList());
+        owner, new ExcludeList(), false);
     assertEquals(c, container, "Expected container was returned");
 
     // Confirm that waitOnePipelineReady was called on allocated pipelines

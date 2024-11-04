@@ -64,7 +64,7 @@ public class WritableRatisContainerProvider
 
   @Override
   public ContainerInfo getContainer(final long size,
-      ReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList, boolean forceContainerCreate)
       throws IOException {
     /*
       Here is the high level logic.
@@ -89,7 +89,7 @@ public class WritableRatisContainerProvider
         PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
 
     ContainerInfo containerInfo =
-        getContainer(repConfig, owner, excludeList, req);
+        getContainer(repConfig, owner, excludeList, req, forceContainerCreate);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -135,7 +135,7 @@ public class WritableRatisContainerProvider
 
     // If Exception occurred or successful creation of pipeline do one
     // final try to fetch pipelines.
-    containerInfo = getContainer(repConfig, owner, excludeList, req);
+    containerInfo = getContainer(repConfig, owner, excludeList, req, forceContainerCreate);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -152,7 +152,7 @@ public class WritableRatisContainerProvider
 
   @Nullable
   private ContainerInfo getContainer(ReplicationConfig repConfig, String owner,
-      ExcludeList excludeList, PipelineRequestInformation req) {
+      ExcludeList excludeList, PipelineRequestInformation req, boolean forceContainerCreate) {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
@@ -160,7 +160,7 @@ public class WritableRatisContainerProvider
     try {
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
           excludeList, Pipeline.PipelineState.OPEN);
-      return selectContainer(availablePipelines, req, owner, excludeList);
+      return selectContainer(availablePipelines, req, owner, excludeList, forceContainerCreate);
     } finally {
       pipelineManager.releaseReadLock();
     }
@@ -183,7 +183,7 @@ public class WritableRatisContainerProvider
 
   private @Nullable ContainerInfo selectContainer(
       List<Pipeline> availablePipelines, PipelineRequestInformation req,
-      String owner, ExcludeList excludeList) {
+      String owner, ExcludeList excludeList, boolean forceContainerCreate) {
 
     while (!availablePipelines.isEmpty()) {
       Pipeline pipeline = pipelineChoosePolicy.choosePipeline(
@@ -191,7 +191,7 @@ public class WritableRatisContainerProvider
 
       // look for OPEN containers that match the criteria.
       final ContainerInfo containerInfo = containerManager.getMatchingContainer(
-          req.getSize(), owner, pipeline, excludeList.getContainerIds());
+          req.getSize(), owner, pipeline, excludeList.getContainerIds(), forceContainerCreate);
 
       if (containerInfo != null) {
         return containerInfo;

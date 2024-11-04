@@ -120,7 +120,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(),
             ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
-            keyArgs.getSortDatanodes(), userInfo);
+            keyArgs.getSortDatanodes(), userInfo,
+            ozoneManager.getClusterMap());
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -169,7 +170,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     long clientID = allocateBlockRequest.getClientID();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumBlockAllocateCalls();
+    //omMetrics.incNumBlockAllocateCalls();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 

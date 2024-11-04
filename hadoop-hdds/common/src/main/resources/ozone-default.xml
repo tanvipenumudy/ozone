@@ -4552,4 +4552,25 @@
       maximum number of buckets across all volumes.
     </description>
   </property>
+  <property>
+    <name>ozone.om.prefetch.max.blocks</name>
+    <value>1000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.prefetch.min.blocks</name>
+    <value>400</value>
+    <tag>OZONE, OM</tag>
+    <description>
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.prefetched.blocks.periodic.validation.interval</name>
+    <value>30s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+    </description>
+  </property>
 </configuration>

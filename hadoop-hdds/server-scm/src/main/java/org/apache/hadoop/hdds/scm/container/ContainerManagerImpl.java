@@ -343,13 +343,13 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public ContainerInfo getMatchingContainer(final long size, final String owner,
-      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs) {
+      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs, boolean forceContainerCreate) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
-        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
+        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline) || forceContainerCreate) {
           allocateContainer(pipeline, owner);
           containerIDs = getContainersForOwner(pipeline, owner);
         }

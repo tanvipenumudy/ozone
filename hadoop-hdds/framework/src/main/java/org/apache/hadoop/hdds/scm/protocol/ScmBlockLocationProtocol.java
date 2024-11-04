@@ -88,7 +88,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
        ReplicationConfig replicationConfig, String owner,
        ExcludeList excludeList) throws IOException {
     return allocateBlock(size, numBlocks, replicationConfig, owner,
-        excludeList, null);
+        excludeList, null, false);
   }
 
   /**
@@ -110,7 +110,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
    */
   List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationConfig replicationConfig, String owner,
-      ExcludeList excludeList, String clientMachine) throws IOException;
+      ExcludeList excludeList, String clientMachine, boolean forceContainerCreate) throws IOException;
 
   /**
    * Delete blocks for a set of object keys.

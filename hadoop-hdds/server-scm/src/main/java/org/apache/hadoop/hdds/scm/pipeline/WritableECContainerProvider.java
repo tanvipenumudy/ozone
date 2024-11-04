@@ -93,14 +93,14 @@ public class WritableECContainerProvider
    */
   @Override
   public ContainerInfo getContainer(final long size,
-      ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
+      ECReplicationConfig repConfig, String owner, ExcludeList excludeList, boolean forceContainerCreate)
       throws IOException {
     int maximumPipelines = getMaximumPipelines(repConfig);
     int openPipelineCount;
     synchronized (this) {
       openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < maximumPipelines) {
+      if (openPipelineCount < maximumPipelines || forceContainerCreate) {
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
