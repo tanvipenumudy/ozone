@@ -92,7 +92,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
     long clientID = allocateBlockRequest.getClientID();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumBlockAllocateCalls();
+    //omMetrics.incNumBlockAllocateCalls();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 

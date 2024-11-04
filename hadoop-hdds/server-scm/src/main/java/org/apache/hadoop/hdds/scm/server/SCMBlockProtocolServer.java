@@ -241,7 +241,7 @@ public class SCMBlockProtocolServer implements
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
             SCMAction.ALLOCATE_BLOCK, auditMap));
       }
-
+      perfMetrics.updateAllocateBlockSuccess();
       return blocks;
     } catch (TimeoutException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
@@ -303,7 +303,7 @@ public class SCMBlockProtocolServer implements
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
                 SCMAction.ALLOCATE_BLOCK, auditMap));
       }
-
+      perfMetrics.updateAllocateBlockSuccess();
       return blocks;
     } catch (TimeoutException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(

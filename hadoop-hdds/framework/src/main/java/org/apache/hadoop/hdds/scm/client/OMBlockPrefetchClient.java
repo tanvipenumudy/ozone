@@ -10,6 +10,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -66,6 +67,7 @@ public class OMBlockPrefetchClient {
     private boolean grpcBlockTokenEnabled;
     private int preallocateBlocksMax;
     private static long scmBlockSize;
+    private static long maxContainerSize;
     private long checkInterval;
     private static String serviceID;
     private static final ReplicationConfig RATIS_THREE =
@@ -101,6 +103,9 @@ public class OMBlockPrefetchClient {
         this.preallocateBlocksMax = conf.getInt(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT);
         scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
                 OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+        maxContainerSize = (long) conf.getStorageSize(
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
         useHostname = conf.getBoolean(
             DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
             DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
@@ -189,7 +194,15 @@ public class OMBlockPrefetchClient {
     private static synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
                                                     LinkedList<AllocatedBlock> blockQueue) throws IOException {
         LOG.info("Prefetching {} AllocatedBlocks from SCM", numBlocks);
-        List<AllocatedBlock> replicatedBlocks = allocateBlocksWithReplicationForce(replicationConfig, numBlocks);
+        long blocksPerContainer = maxContainerSize / scmBlockSize;
+        int containersNeeded = (int) Math.ceil((double) numBlocks / blocksPerContainer);
+        List<AllocatedBlock> replicatedBlocks;
+        if (numBlocks <= containersNeeded) {
+            replicatedBlocks = allocateBlocksWithReplicationForce(replicationConfig, numBlocks);
+        } else {
+            replicatedBlocks = allocateBlocksWithReplicationForce(replicationConfig, containersNeeded);
+            replicatedBlocks.addAll(allocateBlocksWithReplication(replicationConfig, numBlocks - containersNeeded));
+        }
         blockQueue.addAll(replicatedBlocks);
     }
 

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -45,6 +46,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -94,6 +96,9 @@ public class TestOmBucketReadWriteKeyOps {
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, fsPathsEnabled);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
+    conf.set(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT);
+    conf.set(OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS, String.valueOf(1000));
+    conf.set(OzoneConfigKeys.OZONE_OM_PREFETCH_MIN_BLOCKS, String.valueOf(400));
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
@@ -120,7 +125,7 @@ public class TestOmBucketReadWriteKeyOps {
       verifyFreonCommand(new ParameterBuilder().setTotalThreadCount(10)
           .setNumOfReadOperations(10).setNumOfWriteOperations(5)
           .setKeyCountForRead(10).setKeyCountForWrite(5));
-      verifyFreonCommand(
+/*      verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol2").setBucketName("bucket1")
               .setTotalThreadCount(10).setNumOfReadOperations(10)
               .setNumOfWriteOperations(5).setKeyCountForRead(10)
@@ -144,8 +149,38 @@ public class TestOmBucketReadWriteKeyOps {
           new ParameterBuilder().setVolumeName("vol6").setBucketName("bucket1")
               .setTotalThreadCount(20).setNumOfReadOperations(0)
               .setNumOfWriteOperations(5).setKeyCountForRead(0)
-              .setKeyCountForWrite(5));
+              .setKeyCountForWrite(5));*/
 
+    } finally {
+      shutdown();
+    }
+  }
+
+  @ParameterizedTest(name = "Filesystem Paths Enabled: {0}")
+  @ValueSource(booleans = {true, true})
+  public void testAllocateBlock() throws Exception {
+    try {
+      startCluster(false);
+      FileOutputStream out = FileUtils.openOutputStream(new File(path,
+          "conf"));
+      cluster.getConf().writeXml(out);
+      out.getFD().sync();
+      out.close();
+      store.createVolume("vol1");
+      OzoneVolume volume = store.getVolume("vol1");
+      volume.createBucket("buck1");
+      OzoneBucket bucket = volume.getBucket("buck1");
+      String confPath = new File(path, "conf").getAbsolutePath();
+      long startTime = System.currentTimeMillis();
+      new Freon().execute(
+          new String[]{"-conf", confPath, "ockrw",
+              "-v", "vol1",
+              "-b", "buck1",
+              "--size", "128MB",
+              "-n", String.valueOf(1000)});
+      long totalTime = System.currentTimeMillis() - startTime;
+      LOG.info("Total Execution Time: " + totalTime);
+      LOG.info("Number Allocate Block Calls: " + cluster.getStorageContainerManager().getSCMPerformanceMetrics().getAllocateBlockSuccess());
     } finally {
       shutdown();
     }

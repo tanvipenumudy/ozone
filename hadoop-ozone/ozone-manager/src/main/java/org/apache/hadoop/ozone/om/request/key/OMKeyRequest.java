@@ -237,6 +237,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
       locationInfos.add(builder.build());
     }
+    omMetrics.incNumBlockAllocateCalls();
     return locationInfos;
   }
 

@@ -1492,6 +1492,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return addr == null ? "0" : Integer.toString(addr.getPort());
   }
 
+  @VisibleForTesting
+  public SCMPerformanceMetrics getSCMPerformanceMetrics() {
+    return perfMetrics;
+  }
+
   public String getBlockProtocolRpcPort() {
     InetSocketAddress addr = getBlockProtocolServer().getBlockRpcAddress();
     return addr == null ? "0" : Integer.toString(addr.getPort());
