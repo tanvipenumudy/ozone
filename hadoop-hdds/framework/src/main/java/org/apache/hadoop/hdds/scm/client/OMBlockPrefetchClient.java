@@ -86,7 +86,7 @@ public class OMBlockPrefetchClient {
   private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
   private static ScmBlockLocationProtocol scmBlockLocationProtocol = null;
   private static StorageContainerLocationProtocol scmContainerClient = null;
-  private static final Map<ReplicationConfig, LinkedList<AllocatedBlock>> blockQueueMap = new HashMap<>();
+  private static final Map<ReplicationConfig, LinkedList<AllocatedBlock>> BLOCK_QUEUE_MAP = new HashMap<>();
   private static ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue = new ConcurrentLinkedQueue<>();
   private ScheduledExecutorService executorService;
   private static int maxBlocks;
@@ -128,11 +128,11 @@ public class OMBlockPrefetchClient {
     this.serviceID = serviceID;
     this.scmContainerClient = scmContainerClient;
 
-    blockQueueMap.put(RATIS_THREE, new LinkedList<>());
-    blockQueueMap.put(RATIS_ONE, new LinkedList<>());
-    blockQueueMap.put(RS_3_2_1024, new LinkedList<>());
-    blockQueueMap.put(RS_6_3_1024, new LinkedList<>());
-    blockQueueMap.put(XOR_10_4_4096, new LinkedList<>());
+    BLOCK_QUEUE_MAP.put(RATIS_THREE, new LinkedList<>());
+    BLOCK_QUEUE_MAP.put(RATIS_ONE, new LinkedList<>());
+    BLOCK_QUEUE_MAP.put(RS_3_2_1024, new LinkedList<>());
+    BLOCK_QUEUE_MAP.put(RS_6_3_1024, new LinkedList<>());
+    BLOCK_QUEUE_MAP.put(XOR_10_4_4096, new LinkedList<>());
   }
 
   public void start(ConfigurationSource conf) throws IOException, InterruptedException, TimeoutException {
@@ -243,24 +243,26 @@ public class OMBlockPrefetchClient {
     return Duration.ofMillis(refreshDurationInMs);
   }
 
-  private synchronized void validateAndRefillBlocks(ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue)
+  private synchronized void validateAndRefillBlocks(
+      ConcurrentLinkedQueue<Pair<String, ExcludeList>> currentExcludeListQueue)
       throws IOException, InterruptedException {
     waitTobeOutOfSafeMode();
 
     LOG.debug("Validating cached AllocatedBlocks...");
-    for (Map.Entry<ReplicationConfig, LinkedList<AllocatedBlock>> entry : blockQueueMap.entrySet()) {
+    for (Map.Entry<ReplicationConfig, LinkedList<AllocatedBlock>> entry : BLOCK_QUEUE_MAP.entrySet()) {
       ReplicationConfig replicationConfig = entry.getKey();
       LinkedList<AllocatedBlock> blockQueue = entry.getValue();
-      validateAndRefillBlocksUtil(blockQueue, replicationConfig, excludeListQueue);
+      validateAndRefillBlocksUtil(blockQueue, replicationConfig, currentExcludeListQueue);
     }
   }
 
   private static void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue,
                                                   ReplicationConfig replicationConfig,
-                                                  ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue)
+                                                  ConcurrentLinkedQueue<Pair<String,
+                                                  ExcludeList>> currentExcludeListQueue)
       throws IOException {
     blockQueue.removeIf(block -> {
-      boolean isValid = isBlockValid(block, excludeListQueue);
+      boolean isValid = isBlockValid(block, currentExcludeListQueue);
       if (!isValid) {
         LOG.debug("Block {} is no longer valid and will be replaced", block.getBlockID());
       }
@@ -275,11 +277,11 @@ public class OMBlockPrefetchClient {
   }
 
   private static boolean isBlockValid(AllocatedBlock block,
-                                      ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue) {
+                                      ConcurrentLinkedQueue<Pair<String, ExcludeList>> currentExcludeListQueue) {
     ContainerBlockID blockID = block.getBlockID();
     Pipeline pipeline = block.getPipeline();
 
-    for (Pair<String, ExcludeList> entry : excludeListQueue) {
+    for (Pair<String, ExcludeList> entry : currentExcludeListQueue) {
       ExcludeList excludeList = entry.getRight();
       for (DatanodeDetails datanode : pipeline.getNodes()) {
         if (excludeList.getDatanodes().contains(datanode)) {
@@ -296,11 +298,11 @@ public class OMBlockPrefetchClient {
     return true;
   }
 
-  public synchronized static List<AllocatedBlock> getBlock(int numBlocks, ReplicationConfig replicationConfig,
+  public synchronized List<AllocatedBlock> getBlock(int numBlocks, ReplicationConfig replicationConfig,
                                                            String clientMachine, NetworkTopology clusterMap,
                                                            ExcludeList excludeList) {
     queueExcludeList(clientMachine, excludeList);
-    LinkedList<AllocatedBlock> blockQueue = blockQueueMap.get(replicationConfig);
+    LinkedList<AllocatedBlock> blockQueue = BLOCK_QUEUE_MAP.get(replicationConfig);
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     for (int i = 0; i < numBlocks && !blockQueue.isEmpty(); i++) {
       AllocatedBlock block = blockQueue.removeFirst();
@@ -322,7 +324,7 @@ public class OMBlockPrefetchClient {
 
   public static boolean queueSufficient(int numBlocks, ReplicationConfig replicationConfig)
       throws IOException, InterruptedException {
-    LinkedList<AllocatedBlock> blockQueue = blockQueueMap.get(replicationConfig);
+    LinkedList<AllocatedBlock> blockQueue = BLOCK_QUEUE_MAP.get(replicationConfig);
     if (numBlocks > blockQueue.size()) {
       validateAndRefillBlocksUtil(blockQueue, replicationConfig, excludeListQueue);
       return false;
