@@ -182,8 +182,10 @@ public class OMBlockPrefetchClient {
   }
 
   private static void queueExcludeList(String clientMachine, ExcludeList excludeList) {
-    excludeListQueue.removeIf(pair -> pair.getLeft().equals(clientMachine));
-    excludeListQueue.add(Pair.of(clientMachine, excludeList));
+    if (excludeList != null && !excludeList.isEmpty()) {
+      excludeListQueue.removeIf(pair -> pair.getLeft().equals(clientMachine));
+      excludeListQueue.add(Pair.of(clientMachine, excludeList));
+    }
   }
 
   private static synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
