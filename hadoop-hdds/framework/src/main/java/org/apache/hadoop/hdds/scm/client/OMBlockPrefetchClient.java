@@ -304,11 +304,15 @@ public class OMBlockPrefetchClient {
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     for (int i = 0; i < numBlocks && !blockQueue.isEmpty(); i++) {
       AllocatedBlock block = blockQueue.removeFirst();
-      List<DatanodeDetails> sorted = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
-      if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
-        block = block.toBuilder()
-            .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
-            .build();
+      List<DatanodeDetails> nodes = block.getPipeline().getNodes();
+      final Node client = getClientNode(clientMachine, nodes, clusterMap);
+      if (client != null) {
+        List<DatanodeDetails> sorted = clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+        if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
+          block = block.toBuilder()
+              .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
+              .build();
+        }
       }
       allocatedBlocks.add(block);
     }
@@ -324,12 +328,6 @@ public class OMBlockPrefetchClient {
       return false;
     }
     return true;
-  }
-
-  public static List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes, String clientMachine,
-                                                    NetworkTopology clusterMap) {
-    final Node client = getClientNode(clientMachine, nodes, clusterMap);
-    return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
   }
 
   private static Node getClientNode(String clientMachine, List<DatanodeDetails> nodes, NetworkTopology clusterMap) {
