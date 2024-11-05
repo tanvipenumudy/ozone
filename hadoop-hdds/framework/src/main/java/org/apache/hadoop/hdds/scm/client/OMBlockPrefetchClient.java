@@ -298,7 +298,7 @@ public class OMBlockPrefetchClient {
     return true;
   }
 
-  public synchronized List<AllocatedBlock> getBlock(int numBlocks, ReplicationConfig replicationConfig,
+  public static synchronized List<AllocatedBlock> getBlock(int numBlocks, ReplicationConfig replicationConfig,
                                                            String clientMachine, NetworkTopology clusterMap,
                                                            ExcludeList excludeList) {
     queueExcludeList(clientMachine, excludeList);
