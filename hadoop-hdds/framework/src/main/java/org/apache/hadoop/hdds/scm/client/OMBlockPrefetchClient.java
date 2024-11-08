@@ -21,26 +21,28 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.TableMapping;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,16 +56,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
-
-
-import org.apache.commons.lang3.tuple.Pair;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
@@ -77,25 +75,34 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 
 /**
  * OMBlockPrefetchClient prefetches blocks from SCM for quicker write operations.
- * It maintains a queue of allocated blocks categorized by replication configurations and validates them periodically.
- * This client refills the queue in background by allocating additional blocks as needed, ensuring availability during
- * high-throughput scenarios. It also manages an exclude list to avoid nodes that should
- * not be used during block allocation.
+ * It maintains a queue of allocated blocks categorized by replication configurations
+ * and validates them periodically. This client refills the queue in the background
+ * by allocating additional blocks as needed, ensuring availability during high-throughput
+ * scenarios. It also manages an exclude list to avoid nodes that should not be used
+ * during block allocation.
  */
 public class OMBlockPrefetchClient {
-  private static final Logger LOG = LoggerFactory.getLogger(OMBlockPrefetchClient.class);
-  private static ScmBlockLocationProtocol scmBlockLocationProtocol = null;
-  private static StorageContainerLocationProtocol scmContainerClient = null;
-  private static final Map<ReplicationConfig, LinkedList<AllocatedBlock>> BLOCK_QUEUE_MAP = new HashMap<>();
-  private static ConcurrentLinkedQueue<Pair<String, ExcludeList>> excludeListQueue = new ConcurrentLinkedQueue<>();
-  private ScheduledExecutorService executorService;
-  private static int maxBlocks;
-  private static int minBlocks;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMBlockPrefetchClient.class);
+
+  private final ScmBlockLocationProtocol scmBlockLocationProtocol;
+  private final StorageContainerLocationProtocol scmContainerClient;
+  private final String serviceID;
+
+  // Static fields required by static methods
+  private static final Map<ReplicationConfig, LinkedList<AllocatedBlock>> BLOCK_QUEUE_MAP =
+      new HashMap<>();
+  private static final ConcurrentLinkedQueue<Pair<String, ExcludeList>> EXCLUDE_LIST_QUEUE =
+      new ConcurrentLinkedQueue<>();
   private static boolean useHostname;
   private static DNSToSwitchMapping dnsToSwitchMapping;
-  private static long scmBlockSize;
-  private static long maxContainerSize;
-  private static String serviceID;
+  private static int maxBlocks;
+  private static int minBlocks;
+
+  private ScheduledExecutorService executorService;
+  private long scmBlockSize;
+  private long maxContainerSize;
+
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
@@ -104,16 +111,16 @@ public class OMBlockPrefetchClient {
           HddsProtos.ReplicationFactor.ONE);
   private static final ReplicationConfig RS_3_2_1024 =
       ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-          OMBlockPrefetchClient.toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024));
+          toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024));
   private static final ReplicationConfig RS_6_3_1024 =
       ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-          OMBlockPrefetchClient.toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024));
+          toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024));
   private static final ReplicationConfig XOR_10_4_4096 =
       ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
-          OMBlockPrefetchClient.toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096));
+          toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096));
 
-  public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec,
-                                                       int ecChunkSize) {
+  public static HddsProtos.ECReplicationConfig toProto(int data, int parity,
+                                                       ECReplicationConfig.EcCodec codec, int ecChunkSize) {
     return HddsProtos.ECReplicationConfig.newBuilder()
         .setData(data)
         .setParity(parity)
@@ -122,12 +129,8 @@ public class OMBlockPrefetchClient {
         .build();
   }
 
-  public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient,
-                               StorageContainerLocationProtocol scmContainerClient, String serviceID) {
-    this.scmBlockLocationProtocol = scmBlockClient;
-    this.serviceID = serviceID;
-    this.scmContainerClient = scmContainerClient;
-
+  static {
+    // Initialize static fields in static block
     BLOCK_QUEUE_MAP.put(RATIS_THREE, new LinkedList<>());
     BLOCK_QUEUE_MAP.put(RATIS_ONE, new LinkedList<>());
     BLOCK_QUEUE_MAP.put(RS_3_2_1024, new LinkedList<>());
@@ -135,36 +138,52 @@ public class OMBlockPrefetchClient {
     BLOCK_QUEUE_MAP.put(XOR_10_4_4096, new LinkedList<>());
   }
 
-  public void start(ConfigurationSource conf) throws IOException, InterruptedException, TimeoutException {
-    maxBlocks = conf.getInt(OZONE_OM_PREFETCH_MAX_BLOCKS, OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
-    minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS, OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
-    scmBlockSize =
-        (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    useHostname = conf.getBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+  public OMBlockPrefetchClient(ScmBlockLocationProtocol scmBlockClient,
+                               StorageContainerLocationProtocol scmContainerClient, String serviceID) {
+    this.scmBlockLocationProtocol = scmBlockClient;
+    this.serviceID = serviceID;
+    this.scmContainerClient = scmContainerClient;
 
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, OzoneConfiguration.of(conf));
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
-
-    scheduleBlockValidationAndFetch(conf, Instant.now());
+    // Instance fields initialized in constructor
+    this.scmBlockSize = 0;
+    this.maxContainerSize = 0;
   }
 
-  public static void waitTobeOutOfSafeMode() throws InterruptedException, IOException {
-    while (true) {
-      if (!scmContainerClient.inSafeMode()) {
-        return;
+  public void start(ConfigurationSource conf)
+      throws IOException, InterruptedException, TimeoutException {
+
+    // Initialize static fields only if not already initialized
+    synchronized (OMBlockPrefetchClient.class) {
+      if (dnsToSwitchMapping == null) {
+        useHostname = conf.getBoolean(
+            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+            DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+
+        Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+            conf.getClass(
+                DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+                TableMapping.class, DNSToSwitchMapping.class);
+        DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+            dnsToSwitchMappingClass, OzoneConfiguration.of(conf));
+        dnsToSwitchMapping =
+            (newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+                : new CachedDNSToSwitchMapping(newInstance);
+
+        maxBlocks = conf.getInt(OZONE_OM_PREFETCH_MAX_BLOCKS,
+            OZONE_OM_PREFETCH_MAX_BLOCKS_DEFAULT);
+        minBlocks = conf.getInt(OZONE_OM_PREFETCH_MIN_BLOCKS,
+            OZONE_OM_PREFETCH_MIN_BLOCKS_DEFAULT);
       }
-      LOG.info("Waiting for cluster to be ready.");
-      Thread.sleep(5000);
     }
+
+    // Initialize instance fields
+    this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
+        OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+    this.maxContainerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+
+    scheduleBlockValidationAndFetch(conf, Instant.now());
   }
 
   public void stop() {
@@ -181,40 +200,6 @@ public class OMBlockPrefetchClient {
     }
   }
 
-  private static void queueExcludeList(String clientMachine, ExcludeList excludeList) {
-    if (excludeList != null && !excludeList.isEmpty()) {
-      excludeListQueue.removeIf(pair -> pair.getLeft().equals(clientMachine));
-      excludeListQueue.add(Pair.of(clientMachine, excludeList));
-    }
-  }
-
-  private static synchronized void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
-                                                  LinkedList<AllocatedBlock> blockQueue) throws IOException {
-    LOG.info("Prefetching {} blocks from SCM", numBlocks);
-    long blocksPerContainer = maxContainerSize / scmBlockSize;
-    int containersNeeded = (int) Math.ceil((double) numBlocks / blocksPerContainer);
-    List<AllocatedBlock> blocks;
-    try {
-      if (numBlocks <= containersNeeded) {
-        blocks = allocateBlocksWithReplication(replicationConfig, numBlocks, true);
-      } else {
-        blocks = allocateBlocksWithReplication(replicationConfig, containersNeeded, true);
-        blocks.addAll(allocateBlocksWithReplication(replicationConfig, numBlocks - containersNeeded, false));
-      }
-      blockQueue.addAll(blocks);
-    } catch (SCMException ex) {
-      LOG.warn("SCMException occurred: {}. Attempting to fetch a different replication configuration.",
-          ex.getMessage());
-      return;
-    }
-  }
-
-  private static List<AllocatedBlock> allocateBlocksWithReplication(
-      ReplicationConfig replicationConfig, int blockCount, boolean forceContainerCreate) throws IOException {
-    return scmBlockLocationProtocol.allocateBlock(scmBlockSize, blockCount, replicationConfig, serviceID,
-        new ExcludeList(), null, forceContainerCreate);
-  }
-
   private void scheduleBlockValidationAndFetch(ConfigurationSource conf,
                                                Instant initialInvocation) {
     Duration refreshDuration = parseRefreshDuration(conf);
@@ -226,45 +211,57 @@ public class OMBlockPrefetchClient {
     executorService = Executors.newScheduledThreadPool(1, threadFactory);
     Duration initialDelay = Duration.between(Instant.now(), nextRefresh);
 
-    executorService.scheduleAtFixedRate(() -> {
-      try {
-        excludeListQueue = new ConcurrentLinkedQueue<>();
-        validateAndRefillBlocks(excludeListQueue);
-      } catch (IOException | InterruptedException ex) {
-        LOG.error("Error in block validation or refill", ex);
-      }
-    }, initialDelay.toMillis(), refreshDuration.toMillis(), TimeUnit.MILLISECONDS);
+    executorService.scheduleAtFixedRate(
+        () -> {
+          try {
+            EXCLUDE_LIST_QUEUE.clear();
+            validateAndRefillBlocks();
+          } catch (IOException | InterruptedException ex) {
+            LOG.error("Error in block validation or refill", ex);
+          }
+        },
+        initialDelay.toMillis(),
+        refreshDuration.toMillis(),
+        TimeUnit.MILLISECONDS);
   }
 
   public static Duration parseRefreshDuration(ConfigurationSource conf) {
     long refreshDurationInMs = conf.getTimeDuration(
         OZONE_OM_PREFETCHED_BLOCKS_VALIDATION_INTERVAL,
-        OZONE_OM_PREFETCHED_BLOCKS_VALIDATION_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+        OZONE_OM_PREFETCHED_BLOCKS_VALIDATION_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     return Duration.ofMillis(refreshDurationInMs);
   }
 
-  private synchronized void validateAndRefillBlocks(
-      ConcurrentLinkedQueue<Pair<String, ExcludeList>> currentExcludeListQueue)
+  private synchronized void validateAndRefillBlocks()
       throws IOException, InterruptedException {
-    waitTobeOutOfSafeMode();
+    waitToBeOutOfSafeMode();
 
     LOG.debug("Validating cached AllocatedBlocks...");
-    for (Map.Entry<ReplicationConfig, LinkedList<AllocatedBlock>> entry : BLOCK_QUEUE_MAP.entrySet()) {
+    for (Map.Entry<ReplicationConfig, LinkedList<AllocatedBlock>> entry :
+        BLOCK_QUEUE_MAP.entrySet()) {
       ReplicationConfig replicationConfig = entry.getKey();
       LinkedList<AllocatedBlock> blockQueue = entry.getValue();
-      validateAndRefillBlocksUtil(blockQueue, replicationConfig, currentExcludeListQueue);
+      validateAndRefillBlocksUtil(blockQueue, replicationConfig);
     }
   }
 
-  private static void validateAndRefillBlocksUtil(LinkedList<AllocatedBlock> blockQueue,
-                                                  ReplicationConfig replicationConfig,
-                                                  ConcurrentLinkedQueue<Pair<String,
-                                                  ExcludeList>> currentExcludeListQueue)
-      throws IOException {
+  private void waitToBeOutOfSafeMode()
+      throws InterruptedException, IOException {
+    while (scmContainerClient.inSafeMode()) {
+      LOG.info("Waiting for cluster to be ready.");
+      Thread.sleep(5000);
+    }
+  }
+
+  private synchronized void validateAndRefillBlocksUtil(
+      LinkedList<AllocatedBlock> blockQueue,
+      ReplicationConfig replicationConfig) throws IOException {
     blockQueue.removeIf(block -> {
-      boolean isValid = isBlockValid(block, currentExcludeListQueue);
+      boolean isValid = isBlockValid(block);
       if (!isValid) {
-        LOG.debug("Block {} is no longer valid and will be replaced", block.getBlockID());
+        LOG.debug("Block {} is no longer valid and will be replaced",
+            block.getBlockID());
       }
       return !isValid;
     });
@@ -276,19 +273,51 @@ public class OMBlockPrefetchClient {
     }
   }
 
-  private static boolean isBlockValid(AllocatedBlock block,
-                                      ConcurrentLinkedQueue<Pair<String, ExcludeList>> currentExcludeListQueue) {
+  private void prefetchBlocks(int numBlocks, ReplicationConfig replicationConfig,
+                              LinkedList<AllocatedBlock> blockQueue) throws IOException {
+    LOG.info("Prefetching {} blocks from SCM", numBlocks);
+    double blocksPerContainer = (double) maxContainerSize / scmBlockSize;
+    int containersNeeded = (int) Math.ceil(
+        (double) numBlocks / (blocksPerContainer < 1 ? 1 : blocksPerContainer));
+    List<AllocatedBlock> blocks;
+    try {
+      if (numBlocks <= containersNeeded) {
+        blocks = allocateBlocksWithReplication(replicationConfig, numBlocks,
+            true);
+      } else {
+        blocks = allocateBlocksWithReplication(replicationConfig,
+            containersNeeded, true);
+        blocks.addAll(allocateBlocksWithReplication(replicationConfig,
+            numBlocks - containersNeeded, false));
+      }
+      blockQueue.addAll(blocks);
+    } catch (SCMException ex) {
+      LOG.warn("SCMException occurred: {}. Attempting to fetch a different "
+          + "replication configuration.", ex.getMessage());
+    }
+  }
+
+  private List<AllocatedBlock> allocateBlocksWithReplication(
+      ReplicationConfig replicationConfig, int blockCount,
+      boolean forceContainerCreate) throws IOException {
+    return scmBlockLocationProtocol.allocateBlock(scmBlockSize, blockCount,
+        replicationConfig, serviceID, new ExcludeList(), null,
+        forceContainerCreate);
+  }
+
+  private boolean isBlockValid(AllocatedBlock block) {
     ContainerBlockID blockID = block.getBlockID();
     Pipeline pipeline = block.getPipeline();
+    ContainerID containerID = ContainerID.valueOf(blockID.getContainerID());
 
-    for (Pair<String, ExcludeList> entry : currentExcludeListQueue) {
+    for (Pair<String, ExcludeList> entry : EXCLUDE_LIST_QUEUE) {
       ExcludeList excludeList = entry.getRight();
       for (DatanodeDetails datanode : pipeline.getNodes()) {
         if (excludeList.getDatanodes().contains(datanode)) {
           return false;
         }
       }
-      if (excludeList.getContainerIds().contains(blockID.getContainerID())) {
+      if (excludeList.getContainerIds().contains(containerID)) {
         return false;
       }
       if (excludeList.getPipelineIds().contains(pipeline.getId())) {
@@ -298,18 +327,35 @@ public class OMBlockPrefetchClient {
     return true;
   }
 
-  public static synchronized List<AllocatedBlock> getBlock(int numBlocks, ReplicationConfig replicationConfig,
-                                                           String clientMachine, NetworkTopology clusterMap,
-                                                           ExcludeList excludeList) {
+  private static void queueExcludeList(String clientMachine,
+                                       ExcludeList excludeList) {
+    if (excludeList != null && !excludeList.isEmpty()) {
+      EXCLUDE_LIST_QUEUE.removeIf(pair -> pair.getLeft().equals(clientMachine));
+      EXCLUDE_LIST_QUEUE.add(Pair.of(clientMachine, excludeList));
+    }
+  }
+
+  public static synchronized List<AllocatedBlock> getBlock(int numBlocks,
+                                                           ReplicationConfig replicationConfig, String clientMachine,
+                                                           NetworkTopology clusterMap, ExcludeList excludeList) {
+
     queueExcludeList(clientMachine, excludeList);
     LinkedList<AllocatedBlock> blockQueue = BLOCK_QUEUE_MAP.get(replicationConfig);
+
+    if (blockQueue.size() < numBlocks) {
+      LOG.warn("Not enough blocks in the queue for replication config {}",
+          replicationConfig);
+      return Collections.emptyList();
+    }
+
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     for (int i = 0; i < numBlocks && !blockQueue.isEmpty(); i++) {
       AllocatedBlock block = blockQueue.removeFirst();
       List<DatanodeDetails> nodes = block.getPipeline().getNodes();
       final Node client = getClientNode(clientMachine, nodes, clusterMap);
       if (client != null) {
-        List<DatanodeDetails> sorted = clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+        List<DatanodeDetails> sorted = clusterMap.sortByDistanceCost(
+            client, nodes, nodes.size());
         if (!Objects.equals(sorted, block.getPipeline().getNodesInOrder())) {
           block = block.toBuilder()
               .setPipeline(block.getPipeline().copyWithNodesInOrder(sorted))
@@ -320,16 +366,6 @@ public class OMBlockPrefetchClient {
     }
     LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
     return allocatedBlocks;
-  }
-
-  public static boolean queueSufficient(int numBlocks, ReplicationConfig replicationConfig)
-      throws IOException, InterruptedException {
-    LinkedList<AllocatedBlock> blockQueue = BLOCK_QUEUE_MAP.get(replicationConfig);
-    if (numBlocks > blockQueue.size()) {
-      validateAndRefillBlocksUtil(blockQueue, replicationConfig, excludeListQueue);
-      return false;
-    }
-    return true;
   }
 
   private static Node getClientNode(String clientMachine, List<DatanodeDetails> nodes, NetworkTopology clusterMap) {
@@ -344,15 +380,14 @@ public class OMBlockPrefetchClient {
         getOtherNode(clientMachine, clusterMap);
   }
 
-  private static Node getOtherNode(String clientMachine, NetworkTopology clusterMap) {
+  private static Node getOtherNode(String clientMachine,
+                                   NetworkTopology clusterMap) {
     try {
       String clientLocation = resolveNodeLocation(clientMachine);
       if (clientLocation != null) {
         Node rack = clusterMap.getNode(clientLocation);
         if (rack instanceof InnerNode) {
-          return new NodeImpl(clientMachine, clientLocation,
-              (InnerNode) rack, rack.getLevel() + 1,
-              NODE_COST_DEFAULT);
+          return new NodeImpl(clientMachine, clientLocation, (InnerNode) rack, rack.getLevel() + 1, NODE_COST_DEFAULT);
         }
       }
     } catch (Exception e) {

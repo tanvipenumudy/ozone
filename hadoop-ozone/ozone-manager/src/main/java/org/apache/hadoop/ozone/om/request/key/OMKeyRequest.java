@@ -206,12 +206,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      if (!excludeList.isEmpty() || !OMBlockPrefetchClient.queueSufficient(numBlocks, replicationConfig)) {
+      // Attempt to get blocks from OMBlockPrefetchClient
+      allocatedBlocks =
+          OMBlockPrefetchClient.getBlock(numBlocks, replicationConfig, clientMachine, clusterMap, excludeList);
+
+      if (allocatedBlocks.isEmpty()) {
+        // Not enough blocks in the prefetch queue, allocate from SCM
         allocatedBlocks = scmClient.getBlockClient()
             .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine, false);
-      } else {
-        allocatedBlocks =
-            OMBlockPrefetchClient.getBlock(numBlocks, replicationConfig, clientMachine, clusterMap, excludeList);
       }
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
@@ -221,8 +223,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
       }
       throw ex;
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
