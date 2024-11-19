@@ -150,6 +150,12 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check in getObjectTagging")
   private MutableRate getObjectTaggingAclCheckLatencyNs;
 
+  @Metric(about = "Latency of SCM allocateBlock call in nanoseconds")
+  private MutableRate allocateBlockLatencyNs;
+
+  @Metric(about = "Overall allocateBlock method latency in nanoseconds")
+  private MutableRate allocateBlockOverallLatencyNs;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -297,5 +303,13 @@ public class OMPerformanceMetrics {
 
   public void addGetObjectTaggingLatencyNs(long latencyInNs) {
     getObjectTaggingAclCheckLatencyNs.add(latencyInNs);
+  }
+
+  public void addAllocateBlockLatency(long latencyInNs) {
+    allocateBlockLatencyNs.add(latencyInNs);
+  }
+
+  public void addAllocateBlockOverallLatency(long latencyInNs) {
+    allocateBlockOverallLatencyNs.add(latencyInNs);
   }
 }
