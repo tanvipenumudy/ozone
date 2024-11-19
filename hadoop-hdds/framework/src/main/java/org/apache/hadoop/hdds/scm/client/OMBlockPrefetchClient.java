@@ -167,8 +167,8 @@ public class OMBlockPrefetchClient {
 
     expiryExecutor.scheduleAtFixedRate(() -> {
       long currentTime = System.currentTimeMillis();
-      for (Map.Entry<ReplicationConfig,
-          ConcurrentLinkedDeque<ExpiringAllocatedBlock>> entry : blockQueueMap.entrySet()) {
+      for (Map.Entry<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>>
+          entry : blockQueueMap.entrySet()) {
         ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = entry.getValue();
         queue.removeIf(expiringBlock -> currentTime > expiringBlock.getExpiryTime());
       }
