@@ -243,9 +243,11 @@ public class OMBlockPrefetchClient {
                                         ReplicationConfig replicationConfig, String clientMachine,
                                         NetworkTopology clusterMap) {
     metrics.incrementCacheAccesses();
+    metrics.addCacheAccessesValue(numBlocks);
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
     if (queue.size() < numBlocks) {
       metrics.incrementCacheMisses();
+      metrics.addCacheMissesValue(numBlocks);
       return null;
     }
 
@@ -266,12 +268,14 @@ public class OMBlockPrefetchClient {
       metrics.incrementItemsReadFromQueue(allocatedBlocks.size());
       LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
       metrics.incrementCacheHits();
+      metrics.addCacheHitsValue(allocatedBlocks.size());
       return allocatedBlocks;
     } catch (Exception e) {
       metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
       LOG.error("Failed to get blocks from OM cache for replication config {}: {}", replicationConfig,
           e.getMessage(), e);
-      metrics.incrementCacheMisses();
+      metrics.incrementCacheMissesDueToException();
+      metrics.addCacheMissesDueToExceptionValue(numBlocks);
       return null;
     }
   }
