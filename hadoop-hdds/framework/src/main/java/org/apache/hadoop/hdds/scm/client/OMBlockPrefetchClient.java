@@ -35,7 +35,9 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.client.OMBlockPrefetchMetrics;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -75,6 +77,7 @@ public class OMBlockPrefetchClient {
   private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
       new ConcurrentHashMap<>();
   private long expiryDuration;
+  private OMBlockPrefetchMetrics metrics;
 
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
@@ -154,6 +157,7 @@ public class OMBlockPrefetchClient {
     prefetchExecutor = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("BlockPrefetchThread-%d").setDaemon(true).build()
     );
+    metrics = OMBlockPrefetchMetrics.register();
   }
 
   private void startExpiryScheduler(Instant initialInvocation) {
@@ -198,6 +202,7 @@ public class OMBlockPrefetchClient {
         Thread.currentThread().interrupt();
       }
     }
+    OMBlockPrefetchMetrics.unregister();
   }
 
   public void prefetchBlocks(long scmBlockSize, int numBlocks,
@@ -215,18 +220,21 @@ public class OMBlockPrefetchClient {
         return;
       }
 
+      long writeStartTime = Time.monotonicNowNanos();
       try {
         List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(
             scmBlockSize, blocksToFetch, replicationConfig, serviceID, excludeList, null);
-
         for (AllocatedBlock block : newBlocks) {
           long expiryTime = System.currentTimeMillis() + expiryDuration;
           ExpiringAllocatedBlock expiringBlock = new ExpiringAllocatedBlock(block, expiryTime);
           queue.offer(expiringBlock);
         }
+        metrics.incrementItemsWrittenToQueue(newBlocks.size());
         LOG.info("Prefetched {} blocks for replication config {}.", newBlocks.size(), replicationConfig);
       } catch (IOException e) {
         LOG.error("Failed to prefetch blocks for replication config {}: {}", replicationConfig, e.getMessage(), e);
+      } finally {
+        metrics.addWriteToQueueLatency(Time.monotonicNowNanos() - writeStartTime);
       }
     });
   }
@@ -239,6 +247,7 @@ public class OMBlockPrefetchClient {
       return null;
     }
 
+    long readStartTime = Time.monotonicNowNanos();
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     try {
       for (int i = 0; i < numBlocks; i++) {
@@ -251,18 +260,25 @@ public class OMBlockPrefetchClient {
         }
         allocatedBlocks.add(block);
       }
+      metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
+      metrics.incrementItemsReadFromQueue(allocatedBlocks.size());
+      LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
+      return allocatedBlocks;
     } catch (Exception e) {
+      metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
+      LOG.error("Failed to get blocks from OM cache for replication config {}: {}", replicationConfig,
+          e.getMessage(), e);
       return null;
     }
-
-    LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
-    return allocatedBlocks;
   }
 
   public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes, String clientMachine,
                                              NetworkTopology clusterMap) {
+    long startSortTime = Time.monotonicNowNanos();
     final Node client = getClientNode(clientMachine, nodes, clusterMap);
-    return clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+    List<DatanodeDetails> sortedNodes = clusterMap.sortByDistanceCost(client, nodes, nodes.size());
+    metrics.addSortingLogicLatency(Time.monotonicNowNanos() - startSortTime);
+    return sortedNodes;
   }
 
   private Node getClientNode(String clientMachine, List<DatanodeDetails> nodes, NetworkTopology clusterMap) {
