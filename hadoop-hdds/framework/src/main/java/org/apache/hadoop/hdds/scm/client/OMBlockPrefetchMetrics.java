@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.client;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
@@ -55,6 +56,15 @@ public class OMBlockPrefetchMetrics {
   @Metric(about = "Number of items written to the queue")
   private MutableRate itemsWrittenToQueue;
 
+  @Metric(about = "Number of cache hits")
+  private MutableCounterLong cacheHits;
+
+  @Metric(about = "Number of cache misses")
+  private MutableCounterLong cacheMisses;
+
+  @Metric(about = "Number of cache accesses")
+  private MutableCounterLong cacheAccesses;
+
   public void addReadFromQueueLatency(long latencyInNs) {
     readFromQueueLatencyNs.add(latencyInNs);
   }
@@ -73,5 +83,17 @@ public class OMBlockPrefetchMetrics {
 
   public void incrementItemsWrittenToQueue(long itemCount) {
     itemsWrittenToQueue.add(itemCount);
+  }
+
+  public void incrementCacheHits() {
+    cacheHits.incr();
+  }
+
+  public void incrementCacheMisses() {
+    cacheMisses.incr();
+  }
+
+  public void incrementCacheAccesses() {
+    cacheAccesses.incr();
   }
 }
