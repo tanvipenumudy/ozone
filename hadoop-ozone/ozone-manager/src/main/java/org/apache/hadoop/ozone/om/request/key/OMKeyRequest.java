@@ -280,11 +280,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      if (prefetchClient.isCacheSufficient(replicationConfig, numBlocks)) {
-        allocatedBlocks = prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID,
-            excludeList, clientMachine, clusterMap);
-      } else {
-        // Not enough blocks in cache, allocate from SCM
+      allocatedBlocks = prefetchClient.getBlocks(numBlocks, replicationConfig, clientMachine, clusterMap);
+      if (allocatedBlocks == null) {
         allocatedBlocks = scmClient.getBlockClient()
             .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine);
 

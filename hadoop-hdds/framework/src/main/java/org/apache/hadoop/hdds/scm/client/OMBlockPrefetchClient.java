@@ -200,19 +200,10 @@ public class OMBlockPrefetchClient {
     }
   }
 
-  public boolean isCacheSufficient(ReplicationConfig replicationConfig, int numBlocks) {
-    blockQueueMap.computeIfAbsent(replicationConfig, k -> new ConcurrentLinkedDeque<>());
-    ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
-    return queue.size() >= numBlocks;
-  }
-
   public void prefetchBlocks(long scmBlockSize, int numBlocks,
                              ReplicationConfig replicationConfig,
                              String serviceID, ExcludeList excludeList) {
-
-    ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.computeIfAbsent(
-        replicationConfig, k -> new ConcurrentLinkedDeque<>());
-
+    ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
     prefetchExecutor.submit(() -> {
       int currentSize = queue.size();
       int adjustedNumBlocks = Math.min(numBlocks, maxBlocks);
@@ -240,18 +231,18 @@ public class OMBlockPrefetchClient {
     });
   }
 
-  public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks,
-                                        ReplicationConfig replicationConfig, String serviceID,
-                                        ExcludeList excludeList, String clientMachine,
-                                        NetworkTopology clusterMap) throws IOException {
-    blockQueueMap.computeIfAbsent(replicationConfig, k -> new ConcurrentLinkedDeque<>());
+  public List<AllocatedBlock> getBlocks(int numBlocks,
+                                        ReplicationConfig replicationConfig, String clientMachine,
+                                        NetworkTopology clusterMap) {
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
-    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
+    if (queue.size() < numBlocks) {
+      return null;
+    }
 
+    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     try {
       for (int i = 0; i < numBlocks; i++) {
-        ExpiringAllocatedBlock expiringBlock = queue.poll();
-        AllocatedBlock block = expiringBlock.getBlock();
+        AllocatedBlock block = Objects.requireNonNull(queue.poll()).getBlock();
         List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
         if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
           block = block.toBuilder()
@@ -261,10 +252,7 @@ public class OMBlockPrefetchClient {
         allocatedBlocks.add(block);
       }
     } catch (Exception e) {
-      LOG.error("Error retrieving blocks from prefetch queue for replication config {}. Falling back to SCM call: {}",
-          replicationConfig, e.getMessage(), e);
-      return scmBlockLocationProtocol.allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
-          clientMachine);
+      return null;
     }
 
     LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
