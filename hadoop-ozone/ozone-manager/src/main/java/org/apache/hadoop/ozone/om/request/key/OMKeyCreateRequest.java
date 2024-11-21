@@ -153,7 +153,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               keyArgs.getSortDatanodes(),
               userInfo,
               ozoneManager.getClusterMap(),
-              ozoneManager.getOmBlockPrefetchClient());
+              ozoneManager.getOmBlockPrefetchClient(),
+              ozoneManager.getPerfMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
