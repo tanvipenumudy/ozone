@@ -60,25 +60,25 @@ public class OMBlockPrefetchMetrics {
   private MutableCounterLong cacheHits;
 
   @Metric(about = "Cache hits value")
-  private MutableRate cacheHitsValue;
+  private long cacheHitsValue;
 
   @Metric(about = "Number of cache misses")
   private MutableCounterLong cacheMisses;
 
   @Metric(about = "Cache misses value")
-  private MutableRate cacheMissesValue;
+  private long cacheMissesValue;
 
   @Metric(about = "Number of cache misses due to exceptions")
   private MutableCounterLong cacheMissesDueToException;
 
   @Metric(about = "Cache misses due to exceptions value")
-  private MutableRate cacheMissesDueToExceptionValue;
+  private long cacheMissesDueToExceptionValue;
 
   @Metric(about = "Number of cache accesses")
   private MutableCounterLong cacheAccesses;
 
   @Metric(about = "Cache accesses value")
-  private MutableRate cacheAccessesValue;
+  private long cacheAccessesValue;
 
   public void addReadFromQueueLatency(long latencyInNs) {
     readFromQueueLatencyNs.add(latencyInNs);
@@ -101,19 +101,19 @@ public class OMBlockPrefetchMetrics {
   }
 
   public void addCacheHitsValue(long blocksCount) {
-    cacheHitsValue.add(blocksCount);
+    this.cacheHitsValue = blocksCount;
   }
 
   public void addCacheMissesValue(long blocksCount) {
-    cacheMissesValue.add(blocksCount);
+    this.cacheMissesValue = blocksCount;
   }
 
   public void addCacheMissesDueToExceptionValue(long blocksCount) {
-    cacheMissesDueToExceptionValue.add(blocksCount);
+    this.cacheMissesDueToExceptionValue = blocksCount;
   }
 
   public void addCacheAccessesValue(long blocksCount) {
-    cacheAccessesValue.add(blocksCount);
+    this.cacheAccessesValue = blocksCount;
   }
 
   public void incrementCacheHits() {
