@@ -283,10 +283,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
         allocatedBlocks = scmClient.getBlockClient()
             .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine);
         omPerformanceMetrics.addAllocateBlockLatency(Time.monotonicNowNanos() - startSCMAllocateBlock);
-
-        // Prefetch twice the number of requested blocks
-        prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * 2, replicationConfig, serviceID, excludeList);
       }
+
+      // Prefetch twice the number of requested blocks (even when OMBlockPrefetchClient#getBlocks is successful)
+      prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * 2, replicationConfig, serviceID, excludeList);
+
       omPerformanceMetrics.addAllocateBlockOverallLatency(Time.monotonicNowNanos() - startAllocateBlockOverall);
     } catch (SCMException ex) {
       omPerformanceMetrics.addAllocateBlockOverallLatency(Time.monotonicNowNanos() - startAllocateBlockOverall);
