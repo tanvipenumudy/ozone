@@ -72,7 +72,7 @@ public class OMBlockPrefetchClient {
   private int maxBlocks;
   private boolean useHostname;
   private DNSToSwitchMapping dnsToSwitchMapping;
-  private ScheduledExecutorService expiryExecutor;
+//  private ScheduledExecutorService expiryExecutor;
   private ScheduledExecutorService prefetchExecutor;
   private final Map<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>> blockQueueMap =
       new ConcurrentHashMap<>();
@@ -152,7 +152,7 @@ public class OMBlockPrefetchClient {
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
 
-    startExpiryScheduler(Instant.now());
+//    startExpiryScheduler(Instant.now());
 
     prefetchExecutor = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("BlockPrefetchThread-%d").setDaemon(true).build()
@@ -160,37 +160,37 @@ public class OMBlockPrefetchClient {
     metrics = OMBlockPrefetchMetrics.register();
   }
 
-  private void startExpiryScheduler(Instant initialInvocation) {
-    Duration refreshDuration = Duration.ofMillis(expiryDuration);
-    Instant nextExpiry = initialInvocation.plus(refreshDuration);
-
-    expiryExecutor = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder().setNameFormat("BlockExpiryThread-%d").setDaemon(true).build()
-    );
-    Duration initialDelay = Duration.between(Instant.now(), nextExpiry);
-
-    expiryExecutor.scheduleAtFixedRate(() -> {
-      long currentTime = System.currentTimeMillis();
-      for (Map.Entry<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>>
-          entry : blockQueueMap.entrySet()) {
-        ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = entry.getValue();
-        queue.removeIf(expiringBlock -> currentTime > expiringBlock.getExpiryTime());
-      }
-    }, initialDelay.toMillis(), refreshDuration.toMillis(), TimeUnit.MILLISECONDS);
-  }
+//  private void startExpiryScheduler(Instant initialInvocation) {
+//    Duration refreshDuration = Duration.ofMillis(expiryDuration);
+//    Instant nextExpiry = initialInvocation.plus(refreshDuration);
+//
+//    expiryExecutor = Executors.newSingleThreadScheduledExecutor(
+//        new ThreadFactoryBuilder().setNameFormat("BlockExpiryThread-%d").setDaemon(true).build()
+//    );
+//    Duration initialDelay = Duration.between(Instant.now(), nextExpiry);
+//
+//    expiryExecutor.scheduleAtFixedRate(() -> {
+//      long currentTime = System.currentTimeMillis();
+//      for (Map.Entry<ReplicationConfig, ConcurrentLinkedDeque<ExpiringAllocatedBlock>>
+//          entry : blockQueueMap.entrySet()) {
+//        ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = entry.getValue();
+//        queue.removeIf(expiringBlock -> currentTime > expiringBlock.getExpiryTime());
+//      }
+//    }, initialDelay.toMillis(), refreshDuration.toMillis(), TimeUnit.MILLISECONDS);
+//  }
 
   public void stop() {
-    if (expiryExecutor != null) {
-      expiryExecutor.shutdown();
-      try {
-        if (!expiryExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-          expiryExecutor.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        LOG.error("Interrupted while shutting down expiry executor service.", e);
-        Thread.currentThread().interrupt();
-      }
-    }
+//    if (expiryExecutor != null) {
+//      expiryExecutor.shutdown();
+//      try {
+//        if (!expiryExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+//          expiryExecutor.shutdownNow();
+//        }
+//      } catch (InterruptedException e) {
+//        LOG.error("Interrupted while shutting down expiry executor service.", e);
+//        Thread.currentThread().interrupt();
+//      }
+//    }
     if (prefetchExecutor != null) {
       prefetchExecutor.shutdown();
       try {
@@ -239,41 +239,49 @@ public class OMBlockPrefetchClient {
     });
   }
 
-  public List<AllocatedBlock> getBlocks(int numBlocks,
-                                        ReplicationConfig replicationConfig, String clientMachine,
-                                        NetworkTopology clusterMap) {
-    metrics.incrementCacheAccesses();
+  public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
+                                        String serviceID, ExcludeList excludeList, String clientMachine,
+                                        NetworkTopology clusterMap) throws IOException {
+    // metrics.incrementCacheAccesses();
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
-    if (queue.size() < numBlocks) {
-      metrics.incrementCacheMisses();
-      return null;
+//    if (queue.size() < numBlocks) {
+//      metrics.incrementCacheMisses();
+//      return null;
+//    }
+
+    // long readStartTime = Time.monotonicNowNanos();
+    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
+    int retrievedBlocksCount = 0;
+    while (retrievedBlocksCount < numBlocks) {
+      ExpiringAllocatedBlock expiringBlock = queue.peek();
+      if (expiringBlock == null) {
+        break;
+      }
+
+      if (System.currentTimeMillis() > expiringBlock.getExpiryTime()) {
+        queue.poll();
+        continue;
+      }
+
+      queue.poll();
+      AllocatedBlock block = expiringBlock.getBlock();
+      List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
+      if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
+        block = block.toBuilder()
+            .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
+            .build();
+      }
+      allocatedBlocks.add(block);
+      retrievedBlocksCount++;
     }
 
-    long readStartTime = Time.monotonicNowNanos();
-    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
-    try {
-      for (int i = 0; i < numBlocks; i++) {
-        AllocatedBlock block = Objects.requireNonNull(queue.poll()).getBlock();
-        List<DatanodeDetails> sortedNodes = sortDatanodes(block.getPipeline().getNodes(), clientMachine, clusterMap);
-        if (!Objects.equals(sortedNodes, block.getPipeline().getNodesInOrder())) {
-          block = block.toBuilder()
-              .setPipeline(block.getPipeline().copyWithNodesInOrder(sortedNodes))
-              .build();
-        }
-        allocatedBlocks.add(block);
-      }
-      metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
-      metrics.incrementItemsReadFromQueue(allocatedBlocks.size());
-      LOG.info("Returning {} blocks for replication config {}", allocatedBlocks.size(), replicationConfig);
-      metrics.incrementCacheHits();
-      return allocatedBlocks;
-    } catch (Exception e) {
-      metrics.addReadFromQueueLatency(Time.monotonicNowNanos() - readStartTime);
-      LOG.error("Failed to get blocks from OM cache for replication config {}: {}", replicationConfig,
-          e.getMessage(), e);
-      metrics.incrementCacheMissesDueToException();
-      return null;
+    int remainingBlocks = numBlocks - retrievedBlocksCount;
+    if (remainingBlocks > 0) {
+      List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(
+          scmBlockSize, remainingBlocks, replicationConfig, serviceID, excludeList, clientMachine);
+      allocatedBlocks.addAll(newBlocks);
     }
+    return allocatedBlocks;
   }
 
   public List<DatanodeDetails> sortDatanodes(List<DatanodeDetails> nodes, String clientMachine,

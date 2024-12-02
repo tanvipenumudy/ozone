@@ -274,24 +274,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
 
-    long startAllocateBlockOverall = Time.monotonicNowNanos();
     List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = prefetchClient.getBlocks(numBlocks, replicationConfig, clientMachine, clusterMap);
-      if (allocatedBlocks == null) {
-        long startSCMAllocateBlock = Time.monotonicNowNanos();
-        allocatedBlocks = scmClient.getBlockClient()
-            .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList, clientMachine);
-        omPerformanceMetrics.addAllocateBlockLatency(Time.monotonicNowNanos() - startSCMAllocateBlock);
-      }
+      allocatedBlocks = prefetchClient.getBlocks(scmBlockSize, numBlocks, replicationConfig, serviceID, excludeList,
+          clientMachine, clusterMap);
 
       // Prefetch twice the number of requested blocks (even when OMBlockPrefetchClient#getBlocks is successful)
       prefetchClient.prefetchBlocks(scmBlockSize, numBlocks * 2, replicationConfig, serviceID, excludeList);
 
-      omPerformanceMetrics.addAllocateBlockOverallLatency(Time.monotonicNowNanos() - startAllocateBlockOverall);
     } catch (SCMException ex) {
-      omPerformanceMetrics.addAllocateBlockOverallLatency(Time.monotonicNowNanos() - startAllocateBlockOverall);
-      omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
         throw new OMException(ex.getMessage(),
