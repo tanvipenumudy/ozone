@@ -45,12 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.*;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
@@ -74,6 +69,7 @@ public class OMBlockPrefetchClient {
       new ConcurrentHashMap<>();
   private long expiryDuration;
   private OMBlockPrefetchMetrics metrics;
+  private final Semaphore prefetchSemaphore = new Semaphore(10000);
 
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
@@ -174,6 +170,7 @@ public class OMBlockPrefetchClient {
                              String serviceID, ExcludeList excludeList) {
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
     prefetchExecutor.submit(() -> {
+      cleanExpiredBlocks(queue);
       int currentSize = queue.size();
       int adjustedNumBlocks = Math.min(numBlocks, maxBlocks);
       int blocksToFetch = adjustedNumBlocks - currentSize;
@@ -184,21 +181,37 @@ public class OMBlockPrefetchClient {
         return;
       }
 
-      long writeStartTime = Time.monotonicNowNanos();
       try {
-        List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(
-            scmBlockSize, blocksToFetch, replicationConfig, serviceID, excludeList, null);
-        long expiryTime = System.currentTimeMillis() + expiryDuration;
-        for (AllocatedBlock block : newBlocks) {
-          queue.offer(new ExpiringAllocatedBlock(block, expiryTime));
+        prefetchSemaphore.acquire(blocksToFetch);
+        long writeStartTime = Time.monotonicNowNanos();
+        try {
+          List<AllocatedBlock> newBlocks = scmBlockLocationProtocol.allocateBlock(scmBlockSize, blocksToFetch, replicationConfig, serviceID, excludeList, null);
+          long expiryTime = System.currentTimeMillis() + expiryDuration;
+          for (AllocatedBlock block : newBlocks) {
+            queue.offer(new ExpiringAllocatedBlock(block, expiryTime));
+          }
+          LOG.info("Prefetched {} blocks for replication config {}.", newBlocks.size(), replicationConfig);
+        } catch (IOException e) {
+          LOG.error("Failed to prefetch blocks for replication config {}: {}", replicationConfig, e.getMessage(), e);
+        } finally {
+          metrics.addWriteToQueueLatency(Time.monotonicNowNanos() - writeStartTime);
         }
-        LOG.info("Prefetched {} blocks for replication config {}.", newBlocks.size(), replicationConfig);
-      } catch (IOException e) {
-        LOG.error("Failed to prefetch blocks for replication config {}: {}", replicationConfig, e.getMessage(), e);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt(); // Restore interrupted status
       } finally {
-        metrics.addWriteToQueueLatency(Time.monotonicNowNanos() - writeStartTime);
+        prefetchSemaphore.release(blocksToFetch);
       }
     });
+  }
+
+  private void cleanExpiredBlocks(ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue) {
+    while (true) {
+      ExpiringAllocatedBlock block = queue.peek();
+      if (block == null || System.currentTimeMillis() <= block.getExpiryTime()) {
+        break;
+      }
+      queue.poll();
+    }
   }
 
   public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
