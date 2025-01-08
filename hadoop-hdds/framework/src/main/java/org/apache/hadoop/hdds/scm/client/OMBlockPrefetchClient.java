@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
@@ -69,7 +70,7 @@ public class OMBlockPrefetchClient {
       new ConcurrentHashMap<>();
   private long expiryDuration;
   private OMBlockPrefetchMetrics metrics;
-  private final Semaphore prefetchSemaphore = new Semaphore(10000);
+  private Semaphore prefetchSemaphore;
 
   private static final ReplicationConfig RATIS_THREE =
       ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
@@ -110,6 +111,11 @@ public class OMBlockPrefetchClient {
     blockQueueMap.put(XOR_10_4_4096, new ConcurrentLinkedDeque<>());
   }
 
+  public static class ReplicateBlockInfo {
+    Map<> queue = new ConcurrentLinkedDeque<>();
+    Semaphore semaphore = new Semaphore(10000);
+  }
+
   private static final class ExpiringAllocatedBlock {
     private final AllocatedBlock block;
     private final long expiryTime;
@@ -133,6 +139,8 @@ public class OMBlockPrefetchClient {
     expiryDuration = conf.getTimeDuration(OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL,
         OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
 
+    prefetchSemaphore = new Semaphore(maxBlocks);
+
     useHostname = conf.getBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
@@ -147,6 +155,9 @@ public class OMBlockPrefetchClient {
     prefetchExecutor = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("BlockPrefetchThread-%d").setDaemon(true).build()
     );
+    for (i = i to 10) {
+      prefetchExecutor.submit(cacheFetchRatis3);
+    }
     metrics = OMBlockPrefetchMetrics.register();
   }
 
@@ -164,13 +175,16 @@ public class OMBlockPrefetchClient {
     }
     OMBlockPrefetchMetrics.unregister();
   }
+  public void cacheFetch(ReplicateBlockInfo blockInfo, long batchLimit) {
+    blockInfo.semaphore.acquire(batchLimit);
+    ...
+  }
 
   public void prefetchBlocks(long scmBlockSize, int numBlocks,
                              ReplicationConfig replicationConfig,
                              String serviceID, ExcludeList excludeList) {
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
     prefetchExecutor.submit(() -> {
-      cleanExpiredBlocks(queue);
       int currentSize = queue.size();
       int adjustedNumBlocks = Math.min(numBlocks, maxBlocks);
       int blocksToFetch = adjustedNumBlocks - currentSize;
@@ -204,21 +218,13 @@ public class OMBlockPrefetchClient {
     });
   }
 
-  private void cleanExpiredBlocks(ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue) {
-    while (true) {
-      ExpiringAllocatedBlock block = queue.peek();
-      if (block == null || System.currentTimeMillis() <= block.getExpiryTime()) {
-        break;
-      }
-      queue.poll();
-    }
-  }
-
   public List<AllocatedBlock> getBlocks(long scmBlockSize, int numBlocks, ReplicationConfig replicationConfig,
                                         String serviceID, ExcludeList excludeList, String clientMachine,
                                         NetworkTopology clusterMap) throws IOException {
     long readStartTime = Time.monotonicNowNanos();
     ConcurrentLinkedDeque<ExpiringAllocatedBlock> queue = blockQueueMap.get(replicationConfig);
+    // BlockInfo blockInfo = blockQueueMap.get(replicationConfig);
+    // blockInfo.release(numBlocks);
     List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
     int retrievedBlocksCount = 0;
     boolean allocateBlocksFromSCM = false;
