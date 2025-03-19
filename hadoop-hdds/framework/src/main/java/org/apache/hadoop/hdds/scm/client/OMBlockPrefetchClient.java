@@ -269,12 +269,14 @@ public class OMBlockPrefetchClient {
       // If there aren't enough blocks in the cache, we make an RPC call to SCM and prefetch additional batch max + the
       // requested blocks in the same call, avoiding a separate prefetchBlocks call to SCM.
       // int overAllocateBlocks = (remainingBlocks > 0) ? blocksToFetch(queue.size(), ADDITIONAL_BLOCKS_MAX) : 0;
-      List<AllocatedBlock> newBlocks =
-          scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+      if (remainingBlocks > 0) {
+        List<AllocatedBlock> newBlocks =
+            scmBlockLocationProtocol.allocateBlock(scmBlockSize, remainingBlocks, replicationConfig, serviceID,
+                excludeList, clientMachine);
 //      long expiryTime = System.currentTimeMillis() + expiryDuration;
 //      int newBlocksSize = newBlocks.size();
-      allocatedBlocks.addAll(newBlocks.subList(0, remainingBlocks));
+        allocatedBlocks.addAll(newBlocks.subList(0, remainingBlocks));
+      }
 
 //      if (overAllocateBlocks > 0) {
 //        for (AllocatedBlock block : newBlocks.subList(remainingBlocks, newBlocksSize)) {
