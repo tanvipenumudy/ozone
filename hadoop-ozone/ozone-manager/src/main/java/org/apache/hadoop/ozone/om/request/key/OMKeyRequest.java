@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.ALL_PORTS;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -46,6 +47,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -53,12 +57,16 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -279,20 +287,28 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
-    try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
-    } catch (SCMException ex) {
-      omMetrics.incNumBlockAllocateCallFails();
-      if (ex.getResult()
-          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
-        throw new OMException(ex.getMessage(),
-            OMException.ResultCodes.SCM_IN_SAFE_MODE);
-      }
-      throw ex;
-    }
+    List<AllocatedBlock> allocatedBlocks = new ArrayList<>();
+
+//    try {
+//      allocatedBlocks = scmClient.getBlockClient()
+//          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
+//              excludeList, clientMachine);
+//    } catch (SCMException ex) {
+//      omMetrics.incNumBlockAllocateCallFails();
+//      if (ex.getResult()
+//          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+//        throw new OMException(ex.getMessage(),
+//            OMException.ResultCodes.SCM_IN_SAFE_MODE);
+//      }
+//      throw ex;
+//    }
+
+    AllocatedBlock allocatedBlockDummy = AllocatedBlock.newBuilder()
+        .setPipeline(createRatisPipeline())
+        .setContainerBlockID(new ContainerBlockID())
+        .build();
+    allocatedBlocks.add(allocatedBlockDummy);
+
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
@@ -315,6 +331,60 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
+  }
+
+  public static Pipeline createRatisPipeline() {
+
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(randomDatanodeDetails());
+    nodes.add(randomDatanodeDetails());
+    nodes.add(randomDatanodeDetails());
+
+    return Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .setLeaderId(UUID.randomUUID())
+        .build();
+  }
+
+  public static DatanodeDetails randomDatanodeDetails() {
+    return createDatanodeDetails(UUID.randomUUID());
+  }
+
+  public static DatanodeDetails createDatanodeDetails(UUID uuid) {
+    Random random = ThreadLocalRandom.current();
+    String ipAddress = random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256);
+    return createDatanodeDetails(uuid.toString(), "localhost" + "-" + ipAddress,
+        ipAddress, null);
+  }
+
+  public static DatanodeDetails createDatanodeDetails(String uuid,
+                                                      String hostname, String ipAddress, String networkLocation) {
+    return createDatanodeDetails(uuid, hostname, ipAddress, networkLocation, 0);
+  }
+
+  public static DatanodeDetails createDatanodeDetails(String uuid,
+                                                      String hostname, String ipAddress, String networkLocation, int port) {
+
+    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
+        .setUuid(UUID.fromString(uuid))
+        .setHostName(hostname)
+        .setIpAddress(ipAddress)
+        .setNetworkLocation(networkLocation)
+        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+        .setPersistedOpStateExpiry(0);
+
+    for (DatanodeDetails.Port.Name name : ALL_PORTS) {
+      dn.addPort(DatanodeDetails.newPort(name, port));
+    }
+
+    return dn.build();
   }
 
   /**

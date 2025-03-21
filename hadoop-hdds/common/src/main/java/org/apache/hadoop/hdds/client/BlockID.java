@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Objects;
+import java.util.Random;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -33,6 +34,13 @@ public class BlockID {
   // This value would be only set when deserializing from ContainerProtos.DatanodeBlockID or copying from another
   // BlockID object.
   private final Integer replicaIndex;
+  private Random rand = new Random();
+
+  public BlockID() {
+    replicaIndex = null;
+    containerBlockID = new ContainerBlockID();
+    blockCommitSequenceId = rand.nextLong();
+  }
 
   public BlockID(long containerID, long localID) {
     this(containerID, localID, 0, null);
