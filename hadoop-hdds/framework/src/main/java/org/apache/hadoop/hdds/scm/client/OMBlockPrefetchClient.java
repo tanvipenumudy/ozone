@@ -118,7 +118,7 @@ public class OMBlockPrefetchClient {
     blockQueueMap.put(XOR_10_4_4096, new ConcurrentLinkedDeque<>());
   }
 
-  private static final class ExpiringAllocatedBlock {
+  public static final class ExpiringAllocatedBlock {
     private final AllocatedBlock block;
     private final long expiryTime;
 
@@ -127,7 +127,7 @@ public class OMBlockPrefetchClient {
       this.expiryTime = expiryTime;
     }
 
-    private AllocatedBlock getBlock() {
+    public AllocatedBlock getBlock() {
       return block;
     }
 
