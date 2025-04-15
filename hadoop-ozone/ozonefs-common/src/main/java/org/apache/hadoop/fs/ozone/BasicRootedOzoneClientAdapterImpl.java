@@ -379,10 +379,8 @@ public class BasicRootedOzoneClientAdapterImpl
         config);
     String key = ofsPath.getKeyName();
     try {
-//      OzoneBucket bucket = getBucket(ofsPath, false);
       ClientProtocol clientProtocol = ozoneClient.getProxy();
       return clientProtocol.readFile(ofsPath.getVolumeName(), ofsPath.getBucketName(), key).getInputStream();
-//      return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
           || ex.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
@@ -571,10 +569,8 @@ public class BasicRootedOzoneClientAdapterImpl
       return false;
     }
     try {
-//      OzoneBucket bucket = getBucket(ofsPath, false);
-//      bucket.deleteDirectory(keyName, recursive);
-      ClientProtocol clientProtocol = ozoneClient.getProxy();
-      clientProtocol.deleteKey(ofsPath.getVolumeName(), ofsPath.getBucketName(), keyName, false);
+      OzoneBucket bucket = getBucket(ofsPath, false);
+      bucket.deleteDirectory(keyName, recursive);
       return true;
     } catch (OMException ome) {
       LOG.error("Delete key failed. {}", ome.getMessage());
