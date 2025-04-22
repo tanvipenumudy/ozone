@@ -196,10 +196,11 @@ has_scalable_datanode() {
 execute_robot_test(){
   CONTAINER="$1"
   shift 1 #Remove first argument which was the container name
-  # shellcheck disable=SC2206
-  ARGUMENTS=($@)
-  TEST="${ARGUMENTS[${#ARGUMENTS[@]}-1]}" #Use last element as the test name
-  unset 'ARGUMENTS[${#ARGUMENTS[@]}-1]' #Remove the last element, remainings are the custom parameters
+  TEST="$1"
+  shift 1 #Remove the test argument
+  # Remaining arguments are robot parameters
+  local robot_args=("$@")
+
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
 
@@ -235,7 +236,7 @@ execute_robot_test(){
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
-      ${ARGUMENTS[@]} --log NONE --report NONE --output "$OUTPUT_PATH" \
+      "${robot_args[@]}" --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
