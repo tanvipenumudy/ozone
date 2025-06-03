@@ -40,8 +40,10 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.ozone.recon.schema.DirectorySizeSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javax.inject.Inject;
 
 /**
  * Class for handling Legacy specific tasks.
@@ -56,15 +58,16 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
   private final boolean enableFileSystemPaths;
   private final long nsSummaryFlushToDBMaxThreshold;
 
+  @Inject
   public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
                                  reconNamespaceSummaryManager,
                                  ReconOMMetadataManager
                                  reconOMMetadataManager,
                                  OzoneConfiguration
                                  ozoneConfiguration,
-                                 long nsSummaryFlushToDBMaxThreshold) {
-    super(reconNamespaceSummaryManager,
-        reconOMMetadataManager);
+                                 long nsSummaryFlushToDBMaxThreshold,
+                                 DirectorySizeSchemaDefinition directorySizeSchemaDefinition) {
+    super(reconNamespaceSummaryManager, reconOMMetadataManager, directorySizeSchemaDefinition);
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
         .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,

@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.inject.Inject;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -26,6 +28,9 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.ozone.recon.schema.DirectorySizeSchemaDefinition;
+import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,13 +45,17 @@ public class NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private final DSLContext dslContext;
 
+  @Inject
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
-                                     reconOMMetadataManager) {
+                                     reconOMMetadataManager,
+                                     DirectorySizeSchemaDefinition directorySizeSchemaDefinition) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.dslContext = directorySizeSchemaDefinition.getDSLContext();
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -171,6 +180,8 @@ public class NSSummaryTaskDbEventHandler {
                                       Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
+    long objectId = directoryInfo.getObjectID();
+    
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
@@ -184,8 +195,38 @@ public class NSSummaryTaskDbEventHandler {
       return;
     }
 
-    nsSummary.removeChildDir(directoryInfo.getObjectID());
+    // Calculate total size of the directory being deleted
+    long totalSize = getTotalSize(objectId);
+
+    dslContext.insertInto(DSL.table(DirectorySizeSchemaDefinition.DIRECTORY_SIZE_TABLE_NAME))
+        .columns(DSL.field("object_id"), DSL.field("total_size"))
+        .values(objectId, totalSize)
+        .execute();
+
+    nsSummary.removeChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
+  }
+
+  /**
+   * Calculate the total size of a directory recursively.
+   * @param objectId The object ID of the directory
+   * @return The total size of the directory
+   */
+  private long getTotalSize(long objectId) throws IOException {
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (nsSummary == null) {
+      return 0L;
+    }
+
+    long totalSize = nsSummary.getSizeOfFiles();
+    totalSize += nsSummary.getSizeOfFiles();
+    
+    // Recursively calculate size of child directories
+    for (long childDirId : nsSummary.getChildDir()) {
+      totalSize += getTotalSize(childDirId);
+    }
+    
+    return totalSize;
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {

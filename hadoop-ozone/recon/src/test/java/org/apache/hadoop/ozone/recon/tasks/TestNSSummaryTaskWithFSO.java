@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.ozone.recon.schema.DirectorySizeSchemaDefinition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,10 +77,12 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
           true,
           false));
     long threshold = getOzoneConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
+    DirectorySizeSchemaDefinition directorySizeSchemaDefinition =
+        getSchemaDefinition(DirectorySizeSchemaDefinition.class);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(),
-        threshold);
+        threshold, directorySizeSchemaDefinition);
   }
 
   /**

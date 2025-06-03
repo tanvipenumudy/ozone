@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.ozone.recon.schema.DirectorySizeSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,12 +52,14 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
+  @Inject
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
-      long nsSummaryFlushToDBMaxThreshold) {
+      long nsSummaryFlushToDBMaxThreshold,
+      DirectorySizeSchemaDefinition directorySizeSchemaDefinition) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager);
+        reconOMMetadataManager, directorySizeSchemaDefinition);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 

@@ -37,8 +37,10 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.ozone.recon.schema.DirectorySizeSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import javax.inject.Inject;
 
 /**
  * Class for handling FSO specific tasks.
@@ -50,13 +52,15 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
+  @Inject
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
                               reconOMMetadataManager,
-                              long nsSummaryFlushToDBMaxThreshold) {
+                              long nsSummaryFlushToDBMaxThreshold,
+                              DirectorySizeSchemaDefinition directorySizeSchemaDefinition) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager);
+        reconOMMetadataManager, directorySizeSchemaDefinition);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 

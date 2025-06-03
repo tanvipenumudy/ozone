@@ -36,5 +36,6 @@ public class ReconSchemaGenerationModule extends AbstractModule {
     schemaBinder.addBinding().to(ReconTaskSchemaDefinition.class);
     schemaBinder.addBinding().to(StatsSchemaDefinition.class);
     schemaBinder.addBinding().to(SchemaVersionTableDefinition.class);
+    schemaBinder.addBinding().to(DirectorySizeSchemaDefinition.class);
   }
 }

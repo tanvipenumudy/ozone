@@ -64,6 +64,8 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.ozone.recon.schema.DirectorySizeSchemaDefinition;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -141,11 +143,13 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
             .build();
     reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
+    DirectorySizeSchemaDefinition directorySizeSchemaDefinition =
+        getSchemaDefinition(DirectorySizeSchemaDefinition.class);
 
     omTableInsightTask = new OmTableInsightTask(
         globalStatsDao, getConfiguration(), reconOMMetadataManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager, 10);
+        reconNamespaceSummaryManager, reconOMMetadataManager, 10, directorySizeSchemaDefinition);
     dslContext = getDslContext();
 
     omTableInsightTask.setTables(omTableInsightTask.getTaskTables());
